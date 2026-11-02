@@ -306,7 +306,7 @@
           <div>
             <div class="flex items-center gap-2 flex-wrap">
               <h1 class="text-sm sm:text-lg font-black tracking-tight text-white">
-                100년의 유산: 학급 미래 생존 & 발전 대항전 <span class="text-emerald-400 font-bold text-xs sm:text-sm">— 최대 25개국 실시간 중계</span>
+                100년의 유산: 학급 미래 생존 & 발전 대항전 <span class="text-emerald-400 font-bold text-xs sm:text-sm">— 최대 30개국 실시간 중계</span>
               </h1>
               <span class="hidden xl:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                 초등 6학년 도덕 07단원
@@ -327,13 +327,13 @@
             <span>🎲</span> <span>실제 국가 랜덤 재배정</span>
           </button>
           <button onclick="openSetupModal()" class="px-2.5 py-1.5 rounded-xl text-xs font-extrabold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/40 transition flex items-center gap-1">
-            <span>👥</span> <span id="headerStudentCountBtn">참여 인원 설정 (25명)</span>
+            <span>👥</span> <span id="headerStudentCountBtn">참여 인원 설정 (30명)</span>
           </button>
           <button onclick="openRoomModal()" class="px-2.5 py-1.5 rounded-xl text-xs font-extrabold bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-400/40 transition flex items-center gap-1">
             <span>📡</span> <span id="headerRoomCodeText">학생 기기 접속코드</span>
           </button>
-          <button onclick="openBriefingModal()" class="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600/60 transition flex items-center gap-1">
-            <span>🗿</span> <span class="hidden sm:inline">규칙 & 교훈</span>
+          <button onclick="openBriefingModal()" class="px-2.5 py-1.5 rounded-xl text-xs font-extrabold bg-purple-500/25 hover:bg-purple-500/35 text-purple-200 border border-purple-400/50 transition flex items-center gap-1">
+            <span>📖</span> <span>교사용 게임설명 & 규칙</span>
           </button>
           <button id="soundToggleBtn" onclick="toggleSound()" class="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-600/60 transition flex items-center gap-1">
             <span id="soundIcon">🔊</span>
@@ -389,7 +389,7 @@
               </span>
               <div class="flex items-baseline gap-1.5 mt-0.5">
                 <span id="hudAvgTreesValue" class="text-xl sm:text-2xl font-black text-emerald-400">100</span>
-                <span class="text-xs text-slate-400 font-semibold">그루 (생존국 <strong id="hudAliveCount" class="text-white">25</strong>/<span id="hudTotalCount">25</span>)</span>
+                <span class="text-xs text-slate-400 font-semibold">그루 (생존국 <strong id="hudAliveCount" class="text-white">30</strong>/<span id="hudTotalCount">30</span>)</span>
               </div>
             </div>
             <span class="text-2xl">🌲</span>
@@ -504,9 +504,9 @@
           <!-- 전쟁 포격/미사일 궤적 오버레이 Canvas -->
           <canvas id="warEffectCanvas" class="absolute inset-0 w-full h-full pointer-events-none z-40"></canvas>
 
-          <!-- 25개국 영토 그리드 -->
-          <div id="nationsGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 flex-1 relative z-20">
-            <!-- JS로 2~25개 학생 국가 영토 타일 렌더링 -->
+          <!-- 30개국 영토 그리드 -->
+          <div id="nationsGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-6 gap-2 flex-1 relative z-20">
+            <!-- JS로 2~30개 학생 국가 영토 타일 렌더링 -->
           </div>
 
           <!-- 하단 범례 및 안내 -->
@@ -619,7 +619,7 @@
           <div class="flex items-center justify-between border-b border-slate-700/80 pb-2 mb-2">
             <div class="flex gap-1.5">
               <button id="tabBtnRank" onclick="switchRightTab('rank')" class="px-3 py-1 rounded-lg text-xs font-black bg-amber-400 text-slate-950">
-                🏆 실시간 순위 (1~25위)
+                🏆 실시간 순위 (1~30위)
               </button>
               <button id="tabBtnLog" onclick="switchRightTab('log')" class="px-3 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700">
                 📜 중계 기록관 (<span id="logCountNum">0</span>)
@@ -682,33 +682,43 @@
     </div>
   </div>
 
-  <!-- ==================== 모달 B: 👥 참여 학생 수(2~25명) 및 이름 설정 모달 ==================== -->
+  <!-- ==================== 모달 B: 👥 참여 학생 수(2~30명) 및 이름 설정 모달 ==================== -->
   <div id="setupModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/88 backdrop-blur-md no-print">
     <div class="max-w-xl w-full glass-panel rounded-3xl p-6 border-2 border-amber-400/50 shadow-2xl">
       <h2 class="text-xl font-black text-white flex items-center gap-2">
-        <span>👥</span> <span>학급 참여 인원 및 국가 이름 설정 (최대 25명)</span>
+        <span>👥</span> <span>학급 참여 인원 및 국가 이름 설정 (최대 30명)</span>
       </h2>
       <p class="text-xs text-slate-300 mt-1 mb-4">
-        교실 인원수(2명~25명)에 맞게 설정하세요. 학생 이름을 입력하면 각 영토에 학생 이름이 표시됩니다.
+        교실 인원수(2명~30명)에 맞게 설정하세요. 학생 이름을 입력하면 각 영토에 실제 국가명과 함께 학생 이름이 표시됩니다.
       </p>
 
       <div class="mb-4">
-        <label class="text-xs font-extrabold text-amber-300 block mb-1">
-          참여 국가(학생/모둠) 수: <strong id="setupCountLabel" class="text-base text-white">25</strong>명
-        </label>
-        <input id="setupCountRange" type="range" min="2" max="25" value="25" oninput="document.getElementById('setupCountLabel').textContent = this.value" class="w-full accent-emerald-400 cursor-pointer" />
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+          <label class="text-xs font-extrabold text-amber-300">
+            참여 국가(학생/모둠) 수: <strong id="setupCountLabel" class="text-base text-white">30</strong>명
+          </label>
+          <div class="flex flex-wrap gap-1">
+            <button type="button" onclick="setQuickStudentCount(6)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-slate-200 border border-slate-600">6모둠</button>
+            <button type="button" onclick="setQuickStudentCount(15)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-slate-200 border border-slate-600">15명</button>
+            <button type="button" onclick="setQuickStudentCount(20)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-slate-200 border border-slate-600">20명</button>
+            <button type="button" onclick="setQuickStudentCount(25)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-slate-200 border border-slate-600">25명</button>
+            <button type="button" onclick="setQuickStudentCount(30)" class="px-2 py-0.5 rounded bg-emerald-600/40 hover:bg-emerald-500/50 text-[11px] font-extrabold text-emerald-200 border border-emerald-400/50">30명(전체)</button>
+          </div>
+        </div>
+        <input id="setupCountRange" type="range" min="2" max="30" value="30" oninput="document.getElementById('setupCountLabel').textContent = this.value" class="w-full accent-emerald-400 cursor-pointer" />
         <div class="flex justify-between text-[10px] text-slate-400 mt-1">
           <span>2명 (소규모/모둠)</span>
           <span>10명</span>
           <span>15명</span>
           <span>20명</span>
-          <span>25명 (학급 전체)</span>
+          <span>25명</span>
+          <span>30명 (학급 전체)</span>
         </div>
       </div>
 
       <div class="mb-4">
         <label class="text-xs font-extrabold text-emerald-300 block mb-1">
-          학생/모둠 이름 목록 (쉼표 또는 줄바꿈으로 구분, 비워두면 '1번 학생~25번 학생'으로 자동 생성)
+          학생/모둠 이름 목록 (쉼표 또는 줄바꿈으로 구분, 비워두면 '1번~30번'으로 자동 생성)
         </label>
         <textarea id="setupNamesInput" rows="4" placeholder="예: 김민준, 이서연, 박도윤, 최지우, 정하은 ..." class="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-400"></textarea>
       </div>
@@ -752,7 +762,7 @@
         <div class="text-xs font-extrabold text-emerald-300 mb-2">📱 [학생용 기기 접속하기] (학생 태블릿/PC에서 입력)</div>
         <div class="grid grid-cols-2 gap-2 mb-2">
           <input id="joinRoomCodeInput" type="text" placeholder="방 코드 4자리 (예: 4821)" class="bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-xs text-white" />
-          <input id="joinStudentNumInput" type="number" min="1" max="25" placeholder="내 번호 (1~25)" class="bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-xs text-white" />
+          <input id="joinStudentNumInput" type="number" min="1" max="30" placeholder="내 번호 (1~30)" class="bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-xs text-white" />
         </div>
         <button onclick="joinAsStudentClient()" class="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs">
           🚀 내 국가 원격 컨트롤러로 접속하기
@@ -765,70 +775,188 @@
     </div>
   </div>
 
-  <!-- ==================== 모달 1: 게임 시작 브리핑 모달 (이스터섬의 교훈 & 경쟁/전쟁 딜레마 규칙) ==================== -->
-  <div id="briefingModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/88 backdrop-blur-md no-print">
-    <div class="glass-panel max-w-2xl w-full rounded-3xl p-6 sm:p-7 border-2 border-emerald-500/40 shadow-2xl max-h-[92vh] overflow-y-auto">
-      <div class="flex items-center gap-3 mb-4">
-        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center text-3xl shadow-lg">
-          🗿
+  <!-- ==================== 모달 1: 교사용 상세 진행 매뉴얼 & 학생용 게임 시작 브리핑 모달 (맨 앞 화면) ==================== -->
+  <div id="briefingModal" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/92 backdrop-blur-md no-print">
+    <div class="glass-panel max-w-4xl w-full rounded-3xl p-5 sm:p-7 border-2 border-emerald-500/45 shadow-2xl max-h-[94vh] overflow-y-auto">
+      <!-- 상단 헤더 -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-700/80 pb-4 mb-4">
+        <div class="flex items-center gap-3">
+          <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center text-3xl shadow-lg shrink-0">
+            🌍
+          </div>
+          <div>
+            <div class="flex flex-wrap items-center gap-1.5">
+              <span class="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                초등학교 6학년 도덕 · 07. 우리 모두의 미래를 위한 선택
+              </span>
+              <span class="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/40">
+                ✨ 출처: 하모쌤
+              </span>
+            </div>
+            <h2 class="text-lg sm:text-2xl font-black text-white mt-1">
+              100년의 유산: 최대 30개국 학급 미래 생존 & 발전 대항전
+            </h2>
+          </div>
         </div>
-        <div>
-          <div class="flex flex-wrap items-center gap-1.5">
-            <span class="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-              초등학교 6학년 도덕 · 07. 우리 모두의 미래를 위한 선택
-            </span>
-            <span class="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/40">
-              ✨ 출처: 하모쌤
+
+        <!-- 탭 전환 버튼: [👩‍🏫 교사용 진행 가이드] vs [👦👧 학생용 브리핑] -->
+        <div class="flex items-center gap-1.5 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-700 shrink-0 self-start sm:self-center">
+          <button id="briefTabTeacherBtn" onclick="switchBriefingTab('teacher')" class="px-3.5 py-2 rounded-xl text-xs font-black bg-amber-400 text-slate-950 transition flex items-center gap-1 shadow">
+            <span>👩‍🏫</span> <span>교사용 상세 설명서</span>
+          </button>
+          <button id="briefTabStudentBtn" onclick="switchBriefingTab('student')" class="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-300 hover:bg-slate-800 transition flex items-center gap-1">
+            <span>👦👧</span> <span>학생용 브리핑 화면</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ==================== 탭 1: 👩‍🏫 교사용 상세 게임 방식 & 수업 운영 가이드 (기본 표시) ==================== -->
+      <div id="briefingTeacherSection" class="space-y-4">
+        <!-- 1. 핵심 기획 의도 -->
+        <div class="bg-gradient-to-r from-emerald-950/90 via-slate-900/95 to-amber-950/80 border border-emerald-500/40 rounded-2xl p-4">
+          <div class="flex items-center justify-between flex-wrap gap-2 mb-1.5">
+            <h3 class="text-sm sm:text-base font-black text-emerald-300 flex items-center gap-1.5">
+              <span>💡</span> <span>1. 이 게임은 어떤 수업 자료인가요? (기획 의도 & 핵심 구조)</span>
+            </h3>
+            <span class="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/40">
+              권장 소요 시간: 20~35분 (총 15라운드)
             </span>
           </div>
-          <h2 class="text-xl sm:text-2xl font-black text-white mt-1">
-            브리핑: 25개국 미래 생존 대항전 & 공유지의 비극
-          </h2>
+          <p class="text-xs sm:text-sm text-slate-200 leading-relaxed">
+            우리 반 학생들(최대 <strong>30명</strong> 또는 모둠)에게 <strong>실제 세계 30개국(대한민국🇰🇷, 미국🇺🇸, 브라질🇧🇷, 사우디🇸🇦, 투발루🇹🇻 등)</strong>이 무작위로 배정됩니다.
+            각 국가는 서로 다른 초기 자원(🌲나무·💰발전도)과 고유 정책을 가지고 <strong>100년(3세대 × 5라운드 = 총 15라운드)</strong> 동안 <strong>발전도 1위</strong>를 향해 경쟁하며, 다른 나라에 <strong>전쟁(⚔️)</strong>도 선포할 수 있습니다.<br />
+            <strong class="text-amber-300">★ 수업의 핵심 반전(공유지의 비극):</strong> 각자 1등을 차지하려고 무분별한 개발(🏭)과 전쟁(⚔️)을 일삼으면 학급 전체가 공유하는 <strong class="text-rose-300">🌡️ 지구 공동 환경 오염도</strong>가 치솟습니다. 오염도가 <strong>100%에 도달하면 현재 1등 국가가 누구든 상관없이 우리 반 전원이 즉시 공동 배드 엔딩(공멸)</strong>을 맞이하게 되어, 학생들 스스로 <em>"나만 1등하면 되는 게 아니라 지속가능한 협력과 절제가 필수구나!"</em>를 체득하게 됩니다.
+          </p>
+        </div>
+
+        <!-- 2. 교실 여건별 2가지 수업 진행 방식 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <!-- 방식 A: 전자칠판 단독 진행 -->
+          <div class="bg-slate-900/95 border-2 border-amber-400/40 rounded-2xl p-4">
+            <div class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[11px] font-black mb-1.5">
+              🖥️ 방식 A. 선생님 전자칠판(TV) 하나로 진행 (가장 간편·추천!)
+            </div>
+            <ol class="text-xs text-slate-200 space-y-1.5 leading-relaxed list-decimal list-inside">
+              <li>하단 <strong class="text-amber-300">[👥 참여 인원/이름 설정]</strong>에서 우리 반 인원(2~30명 또는 모둠)을 설정합니다.</li>
+              <li>매 라운드마다 화면 중앙의 <strong>학생 국가 타일을 클릭</strong>(또는 <strong class="text-purple-300">[🎲 랜덤 학생 지목]</strong> 클릭)하여 발표시킬 학생에게 <strong>1~4번 정책 또는 5번 전쟁</strong>을 물어보고 우측 패널에서 눌러줍니다.</li>
+              <li>모든 학생을 일일이 누르기 바쁠 때는 상단 <strong class="text-sky-300">[🔀 전체 국가 랜덤 성향 배정]</strong> 또는 <strong class="text-emerald-300">[🏡 전원 적정개발 기본값]</strong>을 누른 뒤, 희망하는 학생 몇 명만 바꿔주면 매우 빠르게 진행됩니다!</li>
+              <li>선택이 끝나면 우측 패널 하단의 <strong class="text-emerald-300">[▶️ 다음 라운드로 진행!]</strong> 버튼을 눌러 해당 라운드 결과를 동시 실행합니다.</li>
+            </ol>
+          </div>
+
+          <!-- 방식 B: 학생 태블릿/스마트폰 연동 -->
+          <div class="bg-slate-900/95 border-2 border-sky-400/40 rounded-2xl p-4">
+            <div class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 text-[11px] font-black mb-1.5">
+              📱 방식 B. 학생 개인 태블릿/스마트폰 원격 연동 (1인 1기기)
+            </div>
+            <ol class="text-xs text-slate-200 space-y-1.5 leading-relaxed list-decimal list-inside">
+              <li>선생님 화면 상단 <strong class="text-sky-300">[📡 학생 기기 접속코드]</strong> 버튼을 눌러 <strong>4자리 방 코드</strong>를 전자칠판에 띄웁니다.</li>
+              <li>학생들도 자기 태블릿/폰으로 <strong>같은 사이트 주소</strong>에 접속한 뒤, 상단 <strong class="text-sky-300">[📡 학생 기기 접속코드]</strong>를 누릅니다.</li>
+              <li>학생이 <strong>방 코드 4자리</strong>와 <strong>자기 번호(1~30번)</strong>를 입력하면 학생 기기가 <strong>내 국가 전용 리모컨</strong>으로 바뀝니다.</li>
+              <li>학생이 자기 기기에서 정책을 누르면 선생님 칠판 타일에 실시간으로 <span class="text-sky-300 font-bold">📱선택완료!</span>가 뜨며, 선생님이 <strong class="text-emerald-300">[▶️ 다음 라운드로 진행!]</strong>을 누르면 일괄 반영됩니다.</li>
+            </ol>
+          </div>
+        </div>
+
+        <!-- 3. 교사가 꼭 알아야 할 핵심 수치 & 게임 메커니즘 요약 -->
+        <div class="bg-slate-900/90 border border-slate-700 rounded-2xl p-4">
+          <h3 class="text-sm font-black text-white mb-2.5 flex items-center gap-1.5">
+            <span>⚙️</span> <span>3. 라운드별 작동 규칙 & 5가지 선택지 메커니즘 (교사용 요약)</span>
+          </h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 text-xs">
+            <div class="bg-slate-800/90 p-3 rounded-xl border border-slate-700">
+              <div class="font-extrabold text-emerald-300 mb-1">🌲 숲의 자연 재생 (20% vs 5%)</div>
+              <p class="text-slate-300 leading-relaxed">
+                매 라운드 종료 시 각 국가는 <strong>남은 나무의 20%가 자연 재생</strong>됩니다. 단, 벌목·전쟁으로 나무가 <strong>30그루 미만</strong>이 되면 재생력을 잃어 <strong>5%만 재생</strong>되며, <strong>0그루가 되면 즉시 국가 멸망(🗿)</strong> 처리됩니다.
+              </p>
+            </div>
+            <div class="bg-slate-800/90 p-3 rounded-xl border border-slate-700">
+              <div class="font-extrabold text-amber-300 mb-1">🏭 1~3번: 국가별 맞춤 정책</div>
+              <p class="text-slate-300 leading-relaxed">
+                • <strong>1번(과잉 개발):</strong> 발전도 급상승, 나무 급감, 지구 오염도 대폭 증가<br />
+                • <strong>2번(적정 개발):</strong> 20% 자연 재생 범위 내 지속가능 발전<br />
+                • <strong>3번(친환경 투자):</strong> 나무 회복 + <strong>지구 공동 오염도 정화(-15%~-20%)</strong>
+              </p>
+            </div>
+            <div class="bg-slate-800/90 p-3 rounded-xl border border-slate-700">
+              <div class="font-extrabold text-purple-300 mb-1">⚡ 4번: 미래 자원 당겨쓰기 (부채)</div>
+              <p class="text-slate-300 leading-relaxed">
+                현 세대에서 당장 큰 발전 점수(+50~64점)를 얻지만, 지구 오염도가 급증하고 <strong>다음 세대(5R·10R 세대교체 이후)부터 매 라운드 발전도 -12점 페널티</strong>가 후손에게 부과됩니다.
+              </p>
+            </div>
+            <div class="bg-slate-800/90 p-3 rounded-xl border border-slate-700">
+              <div class="font-extrabold text-rose-300 mb-1">⚔️ 5번: 침략 전쟁 & 주사위 승부</div>
+              <p class="text-slate-300 leading-relaxed">
+                타깃 국가와 주사위 대결을 벌여 승리 시 상대의 발전도(35점)·나무(15그루)를 약탈합니다. 단, <strong>승패와 무관하게 포화로 양국 숲이 불타고(-10~12그루) 지구 오염도가 급증</strong>합니다!
+              </p>
+            </div>
+            <div class="bg-slate-800/90 p-3 rounded-xl border border-slate-700">
+              <div class="font-extrabold text-red-300 mb-1">🌡️ 지구 오염도와 산불·산사태</div>
+              <p class="text-slate-300 leading-relaxed">
+                지구 공동 오염도가 <strong>50% 이상이면 매 라운드 40% 확률</strong>, <strong>70% 이상이면 80% 확률</strong>로 대형 산불·산사태가 발생해 학급 국가들의 나무가 -15그루씩 불타 사라집니다.
+              </p>
+            </div>
+            <div class="bg-slate-800/90 p-3 rounded-xl border border-slate-700">
+              <div class="font-extrabold text-sky-300 mb-1">🏁 4대 멀티 엔딩 & 성찰 보고서</div>
+              <p class="text-slate-300 leading-relaxed">
+                15라운드 종료 시 <strong>진 엔딩(푸른 기적) / 노멀 엔딩 / 배드 엔딩 1·2</strong>가 판정되며, 3대 부문 시상식과 함께 <strong>성찰 일기장 PDF 인쇄 / PNG 이미지 저장</strong>을 지원합니다.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="bg-slate-900/90 border border-amber-500/30 rounded-2xl p-4 mb-4">
-        <h3 class="text-sm sm:text-base font-extrabold text-amber-300 flex items-center gap-1.5 mb-1.5">
-          <span>🏝️</span> <span>이스터섬의 교훈: "나만 1등하면 될까?"</span>
-        </h3>
-        <p class="text-xs sm:text-sm text-slate-200 leading-relaxed">
-          옛날 이스터섬의 부족들은 자기 부족의 <strong>모아이 석상</strong>을 더 크게 세우려고 경쟁적으로 숲의 나무를 베고 서로 다투었습니다.
-          결국 마지막 나무가 쓰러지자, <strong>1등 부족도 꼴등 부족도 모두 함께 삶의 터전을 잃고 멸망</strong>하고 말았습니다.
-          오늘 우리 반(최대 25개 국가)은 <strong>하나의 지구</strong> 위에서 100년(3세대, 15라운드) 동안 발전 경쟁을 시작합니다!
-        </p>
+      <!-- ==================== 탭 2: 👦👧 학생용 브리핑 화면 (이스터섬의 교훈) ==================== -->
+      <div id="briefingStudentSection" class="hidden space-y-4">
+        <div class="bg-slate-900/90 border border-amber-500/30 rounded-2xl p-4">
+          <h3 class="text-sm sm:text-base font-extrabold text-amber-300 flex items-center gap-1.5 mb-1.5">
+            <span>🏝️</span> <span>이스터섬의 교훈: "나만 1등하면 될까?"</span>
+          </h3>
+          <p class="text-xs sm:text-sm text-slate-200 leading-relaxed">
+            옛날 이스터섬의 부족들은 자기 부족의 <strong>모아이 석상</strong>을 더 크게 세우려고 경쟁적으로 숲의 나무를 베고 서로 다투었습니다.
+            결국 마지막 나무가 쓰러지자, <strong>1등 부족도 꼴등 부족도 모두 함께 삶의 터전을 잃고 멸망</strong>하고 말았습니다.<br />
+            오늘 우리 반(최대 30개 국가)은 각자 실제 세계 국가를 맡아 <strong>하나의 지구</strong> 위에서 100년(3세대, 15라운드) 동안 발전 경쟁을 시작합니다!
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+          <div class="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700">
+            <div class="font-extrabold text-amber-300 mb-1">🏆 1. 30개 실제 국가 배정 & 발전 경쟁</div>
+            <p class="text-slate-300 leading-relaxed">
+              각자 배정받은 국가의 특성에 맞춰 <strong>🌲 숲의 나무</strong>와 <strong>💰 국가 발전도</strong>를 관리하세요. 매 라운드 <strong>🎲 랜덤 시대 이벤트</strong>가 터지며 순위가 요동칩니다!
+            </p>
+          </div>
+          <div class="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700">
+            <div class="font-extrabold text-rose-300 mb-1">⚔️ 2. 자원 전쟁의 유혹과 무서운 대가</div>
+            <p class="text-slate-300 leading-relaxed">
+              다른 친구 나라에 <strong>전쟁(⚔️)</strong>을 걸어 주사위 대결에서 이기면 발전도와 나무를 빼앗지만, 전쟁 포화로 <strong>양국 숲이 불타고 지구 오염도가 급증</strong>합니다!
+            </p>
+          </div>
+          <div class="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700">
+            <div class="font-extrabold text-emerald-300 mb-1">🌲 3. 숲의 자연 재생과 탈락(0그루)</div>
+            <p class="text-slate-300 leading-relaxed">
+              매 라운드 남은 나무의 <strong>20%가 자연 재생</strong>됩니다(30그루 미만 시 <strong>5%로 급감</strong>). 내 나무가 0그루가 되면 그 나라는 <strong>즉시 멸망</strong>합니다!
+            </p>
+          </div>
+          <div class="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700">
+            <div class="font-extrabold text-sky-300 mb-1">🌍 4. 지구 공동 오염도와 다중 엔딩</div>
+            <p class="text-slate-300 leading-relaxed">
+              오염도가 50%·70%를 넘으면 <strong>산불·산사태</strong>가 우리 반 영토들을 덮치며, <strong>100%가 되면 1등이 누구든 학급 전원 공동 배드 엔딩</strong>을 맞이합니다!
+            </p>
+          </div>
+        </div>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs mb-5">
-        <div class="bg-slate-800/80 p-3 rounded-xl border border-slate-700">
-          <div class="font-extrabold text-amber-300 mb-1">🏆 1. 국가별 발전 경쟁 & 랜덤 이벤트</div>
-          <p class="text-slate-300 leading-relaxed">
-            각 학생(모둠)은 자기 영토의 <strong>🌲 나무(100그루)</strong>와 <strong>💰 발전도</strong>를 관리합니다. 매 라운드 <strong>🎲 랜덤 시대 이벤트</strong>가 터지며 순위가 요동칩니다!
-          </p>
+      <!-- 하단 액션 버튼 바 -->
+      <div class="flex flex-wrap items-center justify-between gap-2 mt-5 pt-4 border-t border-slate-700/80">
+        <div class="flex flex-wrap items-center gap-2">
+          <button onclick="closeBriefingModal(); openSetupModal();" class="px-4 py-2.5 rounded-xl font-extrabold text-xs bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/50">
+            👥 학생 인원수(최대 30명)·이름 설정하기
+          </button>
+          <button onclick="switchBriefingTab('student')" id="briefSwitchToStudentHintBtn" class="px-3.5 py-2.5 rounded-xl font-bold text-xs bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-600">
+            👦👧 학생용 브리핑 화면 보기
+          </button>
         </div>
-        <div class="bg-slate-800/80 p-3 rounded-xl border border-slate-700">
-          <div class="font-extrabold text-rose-300 mb-1">⚔️ 2. 자원 전쟁의 유혹과 대가</div>
-          <p class="text-slate-300 leading-relaxed">
-            다른 친구 나라에 <strong>전쟁(⚔️)</strong>을 걸어 주사위 대결에서 이기면 발전도와 나무를 빼앗지만, 전쟁 포화로 <strong>양국 숲이 불타고 지구 오염도가 급증</strong>합니다!
-          </p>
-        </div>
-        <div class="bg-slate-800/80 p-3 rounded-xl border border-slate-700">
-          <div class="font-extrabold text-emerald-300 mb-1">🌲 3. 숲의 자연 재생과 탈락(0그루)</div>
-          <p class="text-slate-300 leading-relaxed">
-            매 라운드 남은 나무의 <strong>20%가 자연 재생</strong>됩니다(30그루 미만 시 <strong>5%로 급감</strong>). 내 나무가 0그루가 되면 해당 국가는 <strong>즉시 멸망</strong>합니다!
-          </p>
-        </div>
-        <div class="bg-slate-800/80 p-3 rounded-xl border border-slate-700">
-          <div class="font-extrabold text-sky-300 mb-1">🌍 4. 지구 공동 오염도와 다중 엔딩</div>
-          <p class="text-slate-300 leading-relaxed">
-            오염도가 50%·70%를 넘으면 <strong>산불·산사태</strong>가 학급 영토들을 덮치며, <strong>100%가 되면 1등이 누구든 학급 전원 공동 배드 엔딩</strong>을 맞이합니다!
-          </p>
-        </div>
-      </div>
-
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <button onclick="closeBriefingModal(); openSetupModal();" class="px-4 py-2.5 rounded-xl font-bold text-xs bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-400/40">
-          👥 학생 인원/이름 먼저 설정하기
-        </button>
         <button onclick="closeBriefingModal()" class="px-7 py-3 rounded-2xl font-black text-sm sm:text-base bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-lg">
           🌍 학급 대항전 중계 시작하기!
         </button>
@@ -1237,9 +1365,9 @@
     ];
 
     /*************************************************************************
-     * 3. 게임 전역 상태 (최대 25개 학생 국가)
+     * 3. 게임 전역 상태 (최대 30개 학생 국가)
      *************************************************************************/
-    let studentCount = 25;
+    let studentCount = 30;
     let customStudentNames = [];
 
     let state = {
@@ -1483,6 +1611,51 @@
           3: { title: '맹그로브 해안방어림 식목 & 태양광', trees: 25, dev: 20, poll: -19 },
           4: { title: '배타적 경제수역 해저자원 조기매각', trees: -10, dev: 46, poll: 21 }
         }
+      },
+      {
+        flag: '🇪🇬', countryName: '이집트', trait: '나일강 문명·사막 태양광', initTrees: 65, initDev: 24,
+        choices: {
+          1: { title: '나일강 삼각주 대규모 공단 & 수자원 전용', trees: -22, dev: 48, poll: 21 },
+          2: { title: '나일강 생태 관개농업 & 오아시스 마을', trees: -8, dev: 27, poll: 3 },
+          3: { title: '사하라 벤반 태양광 단지 & 사막 방풍림', trees: 23, dev: 19, poll: -16 },
+          4: { title: '지하 대수층 조기 고갈 & 무분별 관광개발', trees: -12, dev: 52, poll: 25 }
+        }
+      },
+      {
+        flag: '🇻🇳', countryName: '베트남', trait: '메콩강 삼각주·신흥 제조국', initTrees: 96, initDev: 22,
+        choices: {
+          1: { title: '글로벌 전자·섬유 공단 확장 & 산림개간', trees: -28, dev: 50, poll: 21 },
+          2: { title: '메콩강 친환경 수상 생태마을 & 커피농장', trees: -10, dev: 27, poll: 3 },
+          3: { title: '맹그로브 해안림 복원 & 해상풍력 발전', trees: 23, dev: 18, poll: -16 },
+          4: { title: '해안 모래·석탄 무제한 채굴 & 난개발', trees: -13, dev: 52, poll: 26 }
+        }
+      },
+      {
+        flag: '🇮🇸', countryName: '아이슬란드', trait: '100% 지열·수력 청정 화산섬', initTrees: 74, initDev: 34,
+        choices: {
+          1: { title: '대형 알루미늄 제련소 증설 & 해저개발', trees: -20, dev: 47, poll: 17 },
+          2: { title: '지열 온실 스마트팜 & 에코 온천마을', trees: -6, dev: 29, poll: 1 },
+          3: { title: '화산섬 자작나무 숲 복원 & 탄소포집(DAC)', trees: 24, dev: 20, poll: -20 },
+          4: { title: '빙하 지열원 과잉 시추 & 수산자원 남획', trees: -10, dev: 50, poll: 22 }
+        }
+      },
+      {
+        flag: '🇨🇱', countryName: '칠레', trait: '안데스 구리·리튬·파타고니아 숲', initTrees: 106, initDev: 25,
+        choices: {
+          1: { title: '아타카마 구리·리튬 광산 대확장', trees: -28, dev: 52, poll: 22 },
+          2: { title: '안데스 생태 포도원 & 청정 해안마을', trees: -9, dev: 27, poll: 3 },
+          3: { title: '파타고니아 원시림 보호 & 사막 태양광', trees: 24, dev: 18, poll: -17 },
+          4: { title: '염호 지하수 고갈 리튬 무제한 채굴', trees: -13, dev: 54, poll: 27 }
+        }
+      },
+      {
+        flag: '🇫🇮', countryName: '핀란드', trait: '천 개의 호수와 자작나무 숲', initTrees: 128, initDev: 33,
+        choices: {
+          1: { title: '대형 펄프·제지 공단 증설 & 침엽수 벌목', trees: -28, dev: 48, poll: 18 },
+          2: { title: '호수 생태계 공존 스마트 목조 교육도시', trees: -7, dev: 29, poll: 2 },
+          3: { title: '북극권 타이가 원시림 복원 & 바이오에너지', trees: 24, dev: 19, poll: -18 },
+          4: { title: '이탄지(토탄) 대규모 채굴 & 산림 조기벌채', trees: -12, dev: 51, poll: 24 }
+        }
       }
     ];
 
@@ -1529,7 +1702,7 @@
     function reshuffleRealCountries() {
       playSound('dice');
       initGame();
-      showBroadcastBanner('🎲', '25개 실제 세계 국가 랜덤 배정 완료!', '각 학생에게 새로운 실제 국가와 고유 초기 자원(🌲나무·💰발전도) 및 국가별 맞춤 선택지가 배정되었습니다!');
+      showBroadcastBanner('🎲', `${studentCount}개 실제 세계 국가 랜덤 배정 완료!`, '각 학생에게 새로운 실제 국가와 고유 초기 자원(🌲나무·💰발전도) 및 국가별 맞춤 선택지가 배정되었습니다!');
     }
 
     function initGame() {
@@ -1592,13 +1765,48 @@
       m.classList.remove('flex');
     }
 
+    function setQuickStudentCount(val) {
+      playSound('click');
+      document.getElementById('setupCountRange').value = val;
+      document.getElementById('setupCountLabel').textContent = val;
+    }
+
     function applyStudentSetup() {
       playSound('eco');
-      studentCount = parseInt(document.getElementById('setupCountRange').value, 10) || 25;
+      studentCount = Math.max(2, Math.min(30, parseInt(document.getElementById('setupCountRange').value, 10) || 30));
       const raw = document.getElementById('setupNamesInput').value.trim();
       customStudentNames = raw ? raw.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean) : [];
       closeSetupModal();
       initGame();
+    }
+
+    function switchBriefingTab(tab) {
+      playSound('click');
+      const tSec = document.getElementById('briefingTeacherSection');
+      const sSec = document.getElementById('briefingStudentSection');
+      const tBtn = document.getElementById('briefTabTeacherBtn');
+      const sBtn = document.getElementById('briefTabStudentBtn');
+      const hintBtn = document.getElementById('briefSwitchToStudentHintBtn');
+
+      if (tab === 'teacher') {
+        tSec.classList.remove('hidden');
+        sSec.classList.add('hidden');
+        tBtn.className = 'px-3.5 py-2 rounded-xl text-xs font-black bg-amber-400 text-slate-950 transition flex items-center gap-1 shadow';
+        sBtn.className = 'px-3.5 py-2 rounded-xl text-xs font-bold text-slate-300 hover:bg-slate-800 transition flex items-center gap-1';
+        if (hintBtn) {
+          hintBtn.textContent = '👦👧 학생용 브리핑 화면 보기';
+          hintBtn.onclick = () => switchBriefingTab('student');
+        }
+      } else {
+        tSec.classList.add('hidden');
+        sSec.classList.remove('hidden');
+        sBtn.className = 'px-3.5 py-2 rounded-xl text-xs font-black bg-emerald-400 text-slate-950 transition flex items-center gap-1 shadow';
+        tBtn.className = 'px-3.5 py-2 rounded-xl text-xs font-bold text-slate-300 hover:bg-slate-800 transition flex items-center gap-1';
+        if (hintBtn) {
+          hintBtn.textContent = '👩‍🏫 교사용 상세 설명서 보기';
+          hintBtn.onclick = () => switchBriefingTab('teacher');
+        }
+      }
     }
 
     function openBriefingModal() {
