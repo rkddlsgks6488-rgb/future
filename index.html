@@ -208,14 +208,22 @@
   <!-- ==================== 학생용 원격 컨트롤러 화면 (학생이 방 코드로 접속했을 때만 표시) ==================== -->
   <div id="studentClientView" class="hidden min-h-screen flex-col justify-between p-4 max-w-md mx-auto w-full no-print">
     <div class="glass-panel rounded-3xl p-5 border-2 border-emerald-500/40 flex flex-col gap-4 my-auto">
-      <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+      <div class="flex items-start justify-between gap-2 border-b border-slate-700 pb-3">
         <div>
-          <span class="text-[11px] font-extrabold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">📱 학생 국가 원격 컨트롤러</span>
-          <h2 id="scNationName" class="text-xl font-black text-white mt-1">내 국가: 1번 학생국</h2>
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="text-[11px] font-extrabold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">📱 학생 국가 원격 컨트롤러</span>
+            <span id="scTraitBadge" class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-400/30">국가 배정 완료</span>
+          </div>
+          <h2 id="scNationName" class="text-xl font-black text-white mt-1">내 국가: 연결 확인 중...</h2>
         </div>
-        <span id="scConnectionBadge" class="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/40">
-          🟢 중계방 연결됨
-        </span>
+        <div class="flex flex-col items-end gap-1 shrink-0">
+          <span id="scConnectionBadge" class="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/40">
+            🟢 중계방 연결됨
+          </span>
+          <button onclick="reopenStudentJoinModal()" class="text-[11px] font-extrabold px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-600">
+            🔄 방 코드/번호 변경
+          </button>
+        </div>
       </div>
 
       <!-- 내 국가 현재 수치 -->
@@ -234,52 +242,54 @@
         </div>
       </div>
 
-      <div class="bg-slate-900/80 p-3 rounded-xl border border-amber-500/30 text-xs text-slate-200">
-        <div class="font-extrabold text-amber-300 mb-1">📢 이번 라운드 나의 정책 예약</div>
-        선택한 정책이 선생님 전자칠판 중계 화면에 실시간으로 전송됩니다!
+      <div class="bg-slate-900/80 p-3 rounded-xl border border-amber-500/30 text-xs text-slate-200 flex items-center justify-between gap-2">
+        <div>
+          <div id="scRoundInfoText" class="font-extrabold text-amber-300 mb-0.5">📢 이번 라운드 나의 정책 예약</div>
+          <div>선택한 정책이 선생님 전자칠판에 즉시 반영됩니다!</div>
+        </div>
       </div>
 
-      <!-- 5가지 행동 선택 버튼 -->
+      <!-- 5가지 행동 선택 버튼 (국가별 고유 정책명 자동 동기화) -->
       <div class="space-y-2">
-        <button onclick="sendStudentAction(1)" class="w-full text-left p-3 rounded-xl bg-rose-950/60 hover:bg-rose-900/80 border border-rose-500/50 flex items-center justify-between">
+        <button id="scBtn1" onclick="sendStudentAction(1)" class="w-full text-left p-3 rounded-xl bg-rose-950/60 hover:bg-rose-900/80 border border-rose-500/50 flex items-center justify-between transition">
           <div>
-            <div class="text-sm font-black text-white">🏭 1. 대규모 벌목 및 공장 가동</div>
-            <div class="text-[11px] text-rose-200">나무 -30 | 발전도 +45 (대박 시 +60) | 오염 급증</div>
+            <div id="scBtn1Title" class="text-sm font-black text-white">🏭 1. 대규모 벌목 및 공장 가동</div>
+            <div id="scBtn1Delta" class="text-[11px] text-rose-200">나무 -30 | 발전도 +45 (대박 시 +60) | 오염 급증</div>
           </div>
-          <span class="text-xs font-extrabold text-rose-300">선택</span>
+          <span id="scBtn1Badge" class="text-xs font-extrabold text-rose-300 shrink-0 ml-2">선택</span>
         </button>
 
-        <button onclick="sendStudentAction(2)" class="w-full text-left p-3 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-500/50 flex items-center justify-between">
+        <button id="scBtn2" onclick="sendStudentAction(2)" class="w-full text-left p-3 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-500/50 flex items-center justify-between transition">
           <div>
-            <div class="text-sm font-black text-white">🏡 2. 적정 개발 및 생태 마을 (지속가능)</div>
-            <div class="text-[11px] text-emerald-200">나무 -12 | 발전도 +25 | 숲 자연 재생 유지</div>
+            <div id="scBtn2Title" class="text-sm font-black text-white">🏡 2. 적정 개발 및 생태 마을 (지속가능)</div>
+            <div id="scBtn2Delta" class="text-[11px] text-emerald-200">나무 -12 | 발전도 +25 | 숲 자연 재생 유지</div>
           </div>
-          <span class="text-xs font-extrabold text-emerald-300">선택</span>
+          <span id="scBtn2Badge" class="text-xs font-extrabold text-emerald-300 shrink-0 ml-2">선택</span>
         </button>
 
-        <button onclick="sendStudentAction(3)" class="w-full text-left p-3 rounded-xl bg-cyan-950/60 hover:bg-cyan-900/80 border border-cyan-500/50 flex items-center justify-between">
+        <button id="scBtn3" onclick="sendStudentAction(3)" class="w-full text-left p-3 rounded-xl bg-cyan-950/60 hover:bg-cyan-900/80 border border-cyan-500/50 flex items-center justify-between transition">
           <div>
-            <div class="text-sm font-black text-white">☀️ 3. 친환경 에너지 & 나무 심기</div>
-            <div class="text-[11px] text-cyan-200">나무 +20 | 발전도 +15 | 지구 오염도 정화!</div>
+            <div id="scBtn3Title" class="text-sm font-black text-white">☀️ 3. 친환경 에너지 & 나무 심기</div>
+            <div id="scBtn3Delta" class="text-[11px] text-cyan-200">나무 +20 | 발전도 +15 | 지구 오염도 정화!</div>
           </div>
-          <span class="text-xs font-extrabold text-cyan-300">선택</span>
+          <span id="scBtn3Badge" class="text-xs font-extrabold text-cyan-300 shrink-0 ml-2">선택</span>
         </button>
 
-        <button onclick="sendStudentAction(4)" class="w-full text-left p-3 rounded-xl bg-purple-950/60 hover:bg-purple-900/80 border border-purple-500/50 flex items-center justify-between">
+        <button id="scBtn4" onclick="sendStudentAction(4)" class="w-full text-left p-3 rounded-xl bg-purple-950/60 hover:bg-purple-900/80 border border-purple-500/50 flex items-center justify-between transition">
           <div>
-            <div class="text-sm font-black text-white">⚡ 4. 미래 자원 당겨쓰기 (유혹의 카드)</div>
-            <div class="text-[11px] text-purple-200">나무 -10 | 발전도 +50 | 다음 세대 매 턴 -12점 부채!</div>
+            <div id="scBtn4Title" class="text-sm font-black text-white">⚡ 4. 미래 자원 당겨쓰기 (유혹의 카드)</div>
+            <div id="scBtn4Delta" class="text-[11px] text-purple-200">나무 -10 | 발전도 +50 | 다음 세대 매 턴 -12점 부채!</div>
           </div>
-          <span class="text-xs font-extrabold text-purple-300">선택</span>
+          <span id="scBtn4Badge" class="text-xs font-extrabold text-purple-300 shrink-0 ml-2">선택</span>
         </button>
 
-        <div class="pt-2 border-t border-slate-700">
+        <div id="scBtn5Box" class="pt-2 border-t border-slate-700 rounded-xl p-2 transition">
           <label class="text-xs font-extrabold text-amber-300 block mb-1">⚔️ 5. 다른 국가에 자원 전쟁 선포하기</label>
           <div class="flex gap-2">
-            <select id="scWarTargetSelect" class="flex-1 bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-xs text-white">
+            <select id="scWarTargetSelect" onchange="if(myPlannedAction===5) sendStudentAction(5);" class="flex-1 bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-xs text-white">
               <option value="-1">🎯 1등 국가 또는 랜덤 타깃 공격</option>
             </select>
-            <button onclick="sendStudentAction(5)" class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-xs shrink-0">
+            <button id="scBtn5" onclick="sendStudentAction(5)" class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-xs shrink-0">
               ⚔️ 침략 발동!
             </button>
           </div>
@@ -761,10 +771,11 @@
       <div class="bg-slate-900/90 p-4 rounded-2xl border border-emerald-500/40 mb-4">
         <div class="text-xs font-extrabold text-emerald-300 mb-2">📱 [학생용 기기 접속하기] (학생 태블릿/PC에서 입력)</div>
         <div class="grid grid-cols-2 gap-2 mb-2">
-          <input id="joinRoomCodeInput" type="text" placeholder="방 코드 4자리 (예: 4821)" class="bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-xs text-white" />
+          <input id="joinRoomCodeInput" type="text" maxlength="4" placeholder="방 코드 4자리 (예: 4821)" class="bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-xs text-white" />
           <input id="joinStudentNumInput" type="number" min="1" max="30" placeholder="내 번호 (1~30)" class="bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-xs text-white" />
         </div>
-        <button onclick="joinAsStudentClient()" class="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs">
+        <div id="joinRoomStatusMsg" class="hidden text-xs font-extrabold px-3 py-2 rounded-xl mb-2 text-center"></div>
+        <button id="joinRoomBtn" onclick="joinAsStudentClient()" class="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition">
           🚀 내 국가 원격 컨트롤러로 접속하기
         </button>
       </div>
@@ -1675,7 +1686,12 @@
         const cData = shuffledCountries[(i - 1) % shuffledCountries.length];
         const customStudent = namesList[i - 1] ? namesList[i - 1].trim() : `${i}번`;
         const displayName = `${cData.flag} ${cData.countryName} (${customStudent})`;
-        const defaultAction = i % 5 === 0 ? 3 : (i % 4 === 0 ? 1 : 2);
+        const isPeerConnected = Boolean(
+          typeof studentConnections !== 'undefined' &&
+          studentConnections[i] &&
+          studentConnections[i].open
+        );
+        const defaultAction = 2;
 
         arr.push({
           id: i,
@@ -1693,7 +1709,7 @@
           warTargetId: -1,
           terrainType: cData.initTrees >= 115 ? 'forest' : (cData.initDev >= 40 ? 'factory' : 'village'),
           isEliminated: false,
-          connectedPeer: false
+          connectedPeer: isPeerConnected
         });
       }
       return arr;
@@ -2493,8 +2509,8 @@
         const rate = n.trees < 30 ? 0.05 : 0.20;
         const regen = Math.round(n.trees * rate);
         n.trees = Math.min(150, n.trees + regen);
-        // 전쟁을 한 뒤 다음 라운드 기본 행동은 적정 개발로 복귀
-        if (n.plannedAction === 5 && !n.connectedPeer) n.plannedAction = 2;
+        // 전쟁을 한 뒤 다음 라운드 기본 행동은 적정 개발로 복귀 (학생 화면에도 즉시 동기화됨)
+        if (n.plannedAction === 5) n.plannedAction = 2;
       });
 
       renderAll();
@@ -2931,18 +2947,53 @@
     /*************************************************************************
      * 11. PeerJS 실시간 교실 방 코드 연동 (선생님 중계 <-> 학생 기기)
      *************************************************************************/
+    const PEER_ICE_CONFIG = {
+      debug: 0,
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun.cloudflare.com:3478' },
+          {
+            urls: 'turn:openrelay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          },
+          {
+            urls: 'turn:openrelay.metered.ca:443',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          },
+          {
+            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          }
+        ]
+      }
+    };
+
     let hostPeer = null;
+    let currentHostCode = '';
     let studentConnections = {};
     let clientPeer = null;
     let clientConn = null;
     let myStudentId = 1;
+    let myRoomCode = '';
+    let myPlannedAction = 2;
+    let pendingStudentAction = null;
+    let isStudentClientMode = false;
 
     function openRoomModal() {
       playSound('click');
       const m = document.getElementById('roomModal');
       m.classList.remove('hidden');
       m.classList.add('flex');
-      if (!hostPeer) initTeacherPeerHost();
+      const msgEl = document.getElementById('joinRoomStatusMsg');
+      if (msgEl) msgEl.classList.add('hidden');
+      if (!isStudentClientMode && (!hostPeer || hostPeer.destroyed)) {
+        initTeacherPeerHost();
+      }
     }
 
     function closeRoomModal() {
@@ -2951,37 +3002,127 @@
       m.classList.remove('flex');
     }
 
-    function initTeacherPeerHost() {
+    function reopenStudentJoinModal() {
+      playSound('click');
+      const codeInput = document.getElementById('joinRoomCodeInput');
+      const numInput = document.getElementById('joinStudentNumInput');
+      if (codeInput && myRoomCode) codeInput.value = myRoomCode;
+      if (numInput && myStudentId) numInput.value = myStudentId;
+      openRoomModal();
+    }
+
+    function setJoinModalStatus(text, type = 'info') {
+      const el = document.getElementById('joinRoomStatusMsg');
+      if (!el) return;
+      el.classList.remove('hidden', 'bg-sky-950/90', 'text-sky-300', 'border-sky-500/40', 'bg-rose-950/90', 'text-rose-300', 'border-rose-500/40', 'bg-emerald-950/90', 'text-emerald-300', 'border-emerald-500/40');
+      el.classList.add('border');
+      if (type === 'error') {
+        el.classList.add('bg-rose-950/90', 'text-rose-300', 'border-rose-500/40');
+      } else if (type === 'success') {
+        el.classList.add('bg-emerald-950/90', 'text-emerald-300', 'border-emerald-500/40');
+      } else {
+        el.classList.add('bg-sky-950/90', 'text-sky-300', 'border-sky-500/40');
+      }
+      el.textContent = text;
+    }
+
+    function updateStudentConnectionBadge(isConnected, customText) {
+      const badge = document.getElementById('scConnectionBadge');
+      if (!badge) return;
+      if (isConnected) {
+        badge.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/40';
+        badge.textContent = customText || `🟢 중계방(${myRoomCode}) 연결됨`;
+      } else {
+        badge.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-400/40 animate-pulse';
+        badge.textContent = customText || '🔴 연결 끊김 (자동 재연결 중...)';
+      }
+    }
+
+    function initTeacherPeerHost(retryCount = 0) {
+      if (isStudentClientMode) return;
       if (typeof Peer === 'undefined') {
         document.getElementById('hostRoomCodeDisplay').textContent = '오프라인 모드';
         return;
       }
-      if (hostPeer) hostPeer.destroy();
+      if (hostPeer) {
+        try { hostPeer.destroy(); } catch (e) {}
+        hostPeer = null;
+      }
+      studentConnections = {};
+      state.nations.forEach((n) => { n.connectedPeer = false; });
+      updateConnectedCountUI();
+
       const code = String(Math.floor(1000 + Math.random() * 9000));
-      document.getElementById('hostRoomCodeDisplay').textContent = code;
+      currentHostCode = code;
+      document.getElementById('hostRoomCodeDisplay').textContent = '생성 중...';
       document.getElementById('headerRoomCodeText').textContent = `방 코드: ${code}`;
 
       try {
-        hostPeer = new Peer(`eco-civ-room-${code}`);
+        hostPeer = new Peer(`eco-civ-room-${code}`, PEER_ICE_CONFIG);
+
+        hostPeer.on('open', () => {
+          document.getElementById('hostRoomCodeDisplay').textContent = code;
+          document.getElementById('headerRoomCodeText').textContent = `방 코드: ${code}`;
+        });
+
+        hostPeer.on('disconnected', () => {
+          if (hostPeer && !hostPeer.destroyed) {
+            try { hostPeer.reconnect(); } catch (e) {}
+          }
+        });
+
+        hostPeer.on('error', (err) => {
+          if (err && err.type === 'unavailable-id' && retryCount < 5) {
+            initTeacherPeerHost(retryCount + 1);
+          } else {
+            console.warn('Host PeerJS error:', err);
+          }
+        });
+
         hostPeer.on('connection', (conn) => {
           conn.on('data', (data) => {
+            if (!data || !data.type) return;
             if (data.type === 'JOIN') {
               const sid = Math.max(1, Math.min(state.nations.length, parseInt(data.studentId, 10) || 1));
+              conn._studentId = sid;
               studentConnections[sid] = conn;
               const nation = state.nations.find((n) => n.id === sid);
               if (nation) nation.connectedPeer = true;
               updateConnectedCountUI();
               broadcastStateToStudents();
             } else if (data.type === 'ACTION') {
-              const nation = state.nations.find((n) => n.id === data.studentId);
-              if (nation && !nation.isEliminated) {
-                nation.plannedAction = data.actionId;
-                if (data.warTargetId !== undefined) nation.warTargetId = data.warTargetId;
-                spawnNationFloatingText(nation.id, '📱선택완료!', 'text-sky-300');
+              const sid = Math.max(1, Math.min(state.nations.length, parseInt(data.studentId, 10) || 1));
+              conn._studentId = sid;
+              studentConnections[sid] = conn;
+              const nation = state.nations.find((n) => n.id === sid);
+              if (nation) {
+                nation.connectedPeer = true;
+                if (!nation.isEliminated) {
+                  const actId = parseInt(data.actionId, 10);
+                  if (actId >= 1 && actId <= 5) {
+                    nation.plannedAction = actId;
+                  }
+                  if (data.warTargetId !== undefined) {
+                    nation.warTargetId = parseInt(data.warTargetId, 10);
+                  }
+                  spawnNationFloatingText(nation.id, '📱선택완료!', 'text-sky-300');
+                }
+                updateConnectedCountUI();
                 renderAll();
               }
             }
           });
+
+          const handleClose = () => {
+            if (conn._studentId && studentConnections[conn._studentId] === conn) {
+              delete studentConnections[conn._studentId];
+              const nation = state.nations.find((n) => n.id === conn._studentId);
+              if (nation) nation.connectedPeer = false;
+              updateConnectedCountUI();
+            }
+          };
+          conn.on('close', handleClose);
+          conn.on('error', handleClose);
         });
       } catch (err) {
         console.warn('PeerJS init warning:', err);
@@ -2989,87 +3130,337 @@
     }
 
     function updateConnectedCountUI() {
-      const count = Object.keys(studentConnections).length;
-      document.getElementById('hostConnectedCount').textContent =
-        `현재 기기로 접속한 학생: ${count}명 (나머지 국가는 전자칠판에서 직접/랜덤 조작 가능)`;
+      const openIds = Object.keys(studentConnections).filter((sid) => {
+        const c = studentConnections[sid];
+        return c && c.open;
+      });
+      const el = document.getElementById('hostConnectedCount');
+      if (el) {
+        el.textContent = `현재 기기로 접속한 학생: ${openIds.length}명 (나머지 국가는 전자칠판에서 직접/랜덤 조작 가능)`;
+      }
     }
 
     function broadcastStateToStudents() {
       Object.entries(studentConnections).forEach(([sid, conn]) => {
         const nation = state.nations.find((n) => n.id === Number(sid));
         if (conn && conn.open && nation) {
+          nation.connectedPeer = true;
           conn.send({
             type: 'STATE',
             nation,
+            round: state.round,
+            year: state.year,
+            generation: state.generation,
             pollution: state.pollution,
-            nationsList: state.nations.map((n) => ({ id: n.id, name: n.name, dev: n.dev, isEliminated: n.isEliminated }))
+            nationsList: state.nations.map((n) => ({
+              id: n.id,
+              name: n.name,
+              dev: n.dev,
+              trees: n.trees,
+              isEliminated: n.isEliminated
+            }))
           });
         }
       });
+      updateConnectedCountUI();
+    }
+
+    function renderStudentClientState(data) {
+      if (!data || !data.nation) return;
+      const nation = data.nation;
+      myPlannedAction = nation.plannedAction || 2;
+
+      updateStudentConnectionBadge(true, `🟢 중계방(${myRoomCode}) 연결됨`);
+      document.getElementById('scNationName').textContent = `내 국가: ${nation.name}`;
+      const traitBadge = document.getElementById('scTraitBadge');
+      if (traitBadge) traitBadge.textContent = nation.trait || '특성 국가';
+
+      document.getElementById('scTrees').textContent = `${nation.trees}그루`;
+      document.getElementById('scDev').textContent = `${nation.dev}점`;
+      document.getElementById('scPoll').textContent = `${data.pollution}%`;
+
+      const roundInfo = document.getElementById('scRoundInfoText');
+      if (roundInfo && data.year && data.round) {
+        roundInfo.textContent = `📢 ${data.year}년 (${data.round}/${TOTAL_ROUNDS} 라운드) 나의 정책 예약`;
+      }
+
+      // 국가별 맞춤 1~4번 선택지 제목·수치 업데이트
+      const icons = { 1: '🏭', 2: '🏡', 3: '☀️', 4: '⚡' };
+      if (nation.choices) {
+        for (let c = 1; c <= 4; c++) {
+          const ch = nation.choices[c];
+          const tEl = document.getElementById(`scBtn${c}Title`);
+          const dEl = document.getElementById(`scBtn${c}Delta`);
+          if (tEl && ch) tEl.textContent = `${icons[c]} ${c}. ${ch.title}`;
+          if (dEl && ch) {
+            const trSign = ch.trees >= 0 ? `+${ch.trees}` : ch.trees;
+            const plSign = ch.poll >= 0 ? `+${ch.poll}%` : `${ch.poll}%`;
+            const extra = c === 4 ? ' | 다음 세대 매 턴 -12점 부채!' : '';
+            dEl.textContent = `🌲나무 ${trSign} | 💰발전도 +${ch.dev} | 🌡️오염 ${plSign}${extra}`;
+          }
+        }
+      }
+
+      // 전쟁 타깃 드롭다운 업데이트
+      const sel = document.getElementById('scWarTargetSelect');
+      if (sel && Array.isArray(data.nationsList)) {
+        const curVal = nation.warTargetId && nation.warTargetId !== -1 ? nation.warTargetId : sel.value;
+        sel.innerHTML = `<option value="-1">🎯 1등 국가 또는 랜덤 타깃 공격</option>`;
+        data.nationsList.forEach((other) => {
+          if (other.id !== nation.id && !other.isEliminated) {
+            const opt = document.createElement('option');
+            opt.value = other.id;
+            opt.textContent = `🎯 ${other.name} (💰${other.dev}점)`;
+            if (String(other.id) === String(curVal)) opt.selected = true;
+            sel.appendChild(opt);
+          }
+        });
+      }
+
+      // 현재 선택된 행동 버튼 하이라이트 & 하단 상태창 동기화
+      updateStudentActionHighlight(nation);
+    }
+
+    function updateStudentActionHighlight(nation) {
+      const planned = nation ? nation.plannedAction : myPlannedAction;
+      for (let i = 1; i <= 4; i++) {
+        const btn = document.getElementById(`scBtn${i}`);
+        const bdg = document.getElementById(`scBtn${i}Badge`);
+        if (!btn) continue;
+        if (planned === i) {
+          btn.classList.add('ring-2', 'ring-amber-300', 'scale-[1.01]');
+          if (bdg) bdg.textContent = '✅ 선택됨';
+        } else {
+          btn.classList.remove('ring-2', 'ring-amber-300', 'scale-[1.01]');
+          if (bdg) bdg.textContent = '선택';
+        }
+      }
+      const box5 = document.getElementById('scBtn5Box');
+      const btn5 = document.getElementById('scBtn5');
+      if (box5 && btn5) {
+        if (planned === 5) {
+          box5.classList.add('ring-2', 'ring-amber-300', 'bg-rose-950/40');
+          btn5.textContent = '✅ 전쟁 예약됨!';
+        } else {
+          box5.classList.remove('ring-2', 'ring-amber-300', 'bg-rose-950/40');
+          btn5.textContent = '⚔️ 침략 발동!';
+        }
+      }
+
+      const statusEl = document.getElementById('scSelectedStatus');
+      if (!statusEl) return;
+      if (nation && nation.isEliminated) {
+        statusEl.textContent = '💀 내 국가의 나무가 모두 사라져 멸망했습니다 (새 게임 시작 시 부활)';
+        statusEl.className = 'text-center text-xs font-extrabold text-rose-400 bg-slate-900 p-2.5 rounded-xl border border-rose-500/40';
+        return;
+      }
+      statusEl.className = 'text-center text-xs font-extrabold text-amber-300 bg-slate-900 p-2.5 rounded-xl border border-slate-700';
+      const act = ACTION_META[planned] || ACTION_META[2];
+      const customChoice = nation && nation.choices && nation.choices[planned];
+      const label = planned === 5
+        ? `${act.icon} 5. 이웃 국가 침략 전쟁 선포!`
+        : (customChoice ? `${act.icon} ${planned}. ${customChoice.title}` : act.name);
+      statusEl.textContent = `✅ 선생님 칠판에 반영된 내 선택: ${label}`;
     }
 
     function joinAsStudentClient() {
       const code = document.getElementById('joinRoomCodeInput').value.trim();
-      const sNum = parseInt(document.getElementById('joinStudentNumInput').value, 10) || 1;
-      if (!code) return;
+      const sNum = parseInt(document.getElementById('joinStudentNumInput').value, 10);
+      if (!code || code.length !== 4) {
+        setJoinModalStatus('⚠️ 선생님 화면의 4자리 방 코드를 정확히 입력해주세요!', 'error');
+        return;
+      }
+      if (!sNum || sNum < 1 || sNum > 30) {
+        setJoinModalStatus('⚠️ 내 번호(1~30번)를 정확히 입력해주세요!', 'error');
+        return;
+      }
+      if (typeof Peer === 'undefined') {
+        setJoinModalStatus('⚠️ 네트워크 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인해주세요.', 'error');
+        return;
+      }
+
+      playSound('click');
       myStudentId = sNum;
+      myRoomCode = code;
+      isStudentClientMode = true;
 
-      closeRoomModal();
-      document.getElementById('gameRoot').classList.add('hidden');
-      const scView = document.getElementById('studentClientView');
-      scView.classList.remove('hidden');
-      scView.classList.add('flex');
-      document.getElementById('scNationName').textContent = `내 국가: ${myStudentId}번 학생국`;
+      // 학생 기기에서는 불필요한 호스트 Peer 정리
+      if (hostPeer) {
+        try { hostPeer.destroy(); } catch (e) {}
+        hostPeer = null;
+      }
 
-      if (typeof Peer !== 'undefined') {
-        clientPeer = new Peer();
+      const joinBtn = document.getElementById('joinRoomBtn');
+      if (joinBtn) {
+        joinBtn.disabled = true;
+        joinBtn.textContent = '⏳ 중계방 연결 중...';
+      }
+      setJoinModalStatus(`⏳ 선생님 중계방(${code})에 접속 중입니다... 잠시만 기다려주세요!`, 'info');
+
+      connectStudentPeerWithRetry(code, sNum, 1, 3);
+    }
+
+    function connectStudentPeerWithRetry(code, sNum, attempt, maxAttempts) {
+      if (clientPeer) {
+        try { clientPeer.destroy(); } catch (e) {}
+        clientPeer = null;
+      }
+      clientConn = null;
+
+      let stateReceived = false;
+      let joinSyncInterval = null;
+      let attemptTimeout = null;
+
+      const cleanupTimers = () => {
+        if (joinSyncInterval) { clearInterval(joinSyncInterval); joinSyncInterval = null; }
+        if (attemptTimeout) { clearTimeout(attemptTimeout); attemptTimeout = null; }
+      };
+
+      const handleRetryOrFail = (reason) => {
+        if (stateReceived) return;
+        cleanupTimers();
+        if (attempt < maxAttempts) {
+          setJoinModalStatus(`🔄 중계방 신호를 다시 찾는 중입니다... (${attempt + 1}/${maxAttempts})`, 'info');
+          setTimeout(() => connectStudentPeerWithRetry(code, sNum, attempt + 1, maxAttempts), 800);
+        } else {
+          const joinBtn = document.getElementById('joinRoomBtn');
+          if (joinBtn) {
+            joinBtn.disabled = false;
+            joinBtn.textContent = '🚀 내 국가 원격 컨트롤러로 접속하기';
+          }
+          setJoinModalStatus(
+            reason === 'peer-unavailable'
+              ? `❌ 방 코드(${code})를 찾을 수 없습니다! 선생님 화면 우측 상단의 방 코드 4자리를 다시 확인해주세요.`
+              : `❌ 연결이 지연되고 있습니다. 방 코드(${code})를 확인하고 다시 한 번 눌러주세요!`,
+            'error'
+          );
+          updateStudentConnectionBadge(false, '🔴 연결 안 됨 (방 코드 재확인)');
+        }
+      };
+
+      attemptTimeout = setTimeout(() => handleRetryOrFail('timeout'), 6500);
+
+      try {
+        clientPeer = new Peer(PEER_ICE_CONFIG);
+
         clientPeer.on('open', () => {
-          clientConn = clientPeer.connect(`eco-civ-room-${code}`);
-          clientConn.on('open', () => {
-            clientConn.send({ type: 'JOIN', studentId: myStudentId });
-          });
-          clientConn.on('data', (data) => {
-            if (data.type === 'STATE' && data.nation) {
-              document.getElementById('scNationName').textContent = `내 국가: ${data.nation.name}`;
-              document.getElementById('scTrees').textContent = `${data.nation.trees}그루`;
-              document.getElementById('scDev').textContent = `${data.nation.dev}점`;
-              document.getElementById('scPoll').textContent = `${data.pollution}%`;
+          const conn = clientPeer.connect(`eco-civ-room-${code}`, { reliable: true });
+          clientConn = conn;
 
-              const sel = document.getElementById('scWarTargetSelect');
-              const curVal = sel.value;
-              sel.innerHTML = `<option value="-1">🎯 1등 국가 또는 랜덤 타깃 공격</option>`;
-              data.nationsList.forEach((other) => {
-                if (other.id !== myStudentId && !other.isEliminated) {
-                  const opt = document.createElement('option');
-                  opt.value = other.id;
-                  opt.textContent = `🎯 ${other.name} (${other.dev}점)`;
-                  if (String(other.id) === String(curVal)) opt.selected = true;
-                  sel.appendChild(opt);
+          const sendJoinPacket = () => {
+            if (conn && conn.open) {
+              conn.send({ type: 'JOIN', studentId: myStudentId });
+              if (pendingStudentAction) {
+                conn.send(pendingStudentAction);
+                pendingStudentAction = null;
+              }
+            }
+          };
+
+          conn.on('open', () => {
+            sendJoinPacket();
+            joinSyncInterval = setInterval(() => {
+              if (!stateReceived && conn.open) sendJoinPacket();
+            }, 700);
+          });
+
+          conn.on('data', (data) => {
+            if (data && data.type === 'STATE' && data.nation) {
+              stateReceived = true;
+              cleanupTimers();
+
+              const joinBtn = document.getElementById('joinRoomBtn');
+              if (joinBtn) {
+                joinBtn.disabled = false;
+                joinBtn.textContent = '🚀 내 국가 원격 컨트롤러로 접속하기';
+              }
+
+              // 연결이 확인된 즉시 학생 컨트롤러 화면으로 전환 및 실제 국가명 렌더링!
+              closeRoomModal();
+              document.getElementById('briefingModal').classList.add('hidden');
+              document.getElementById('briefingModal').classList.remove('flex');
+              document.getElementById('gameRoot').classList.add('hidden');
+              const scView = document.getElementById('studentClientView');
+              scView.classList.remove('hidden');
+              scView.classList.add('flex');
+
+              renderStudentClientState(data);
+            }
+          });
+
+          conn.on('close', () => {
+            if (stateReceived) {
+              updateStudentConnectionBadge(false, '🔴 연결 끊김 (자동 재연결 중...)');
+              setTimeout(() => {
+                if (isStudentClientMode && myRoomCode) {
+                  connectStudentPeerWithRetry(myRoomCode, myStudentId, 1, 2);
                 }
-              });
+              }, 1200);
             }
           });
         });
+
+        clientPeer.on('disconnected', () => {
+          if (clientPeer && !clientPeer.destroyed) {
+            try { clientPeer.reconnect(); } catch (e) {}
+          }
+        });
+
+        clientPeer.on('error', (err) => {
+          handleRetryOrFail(err && err.type ? err.type : 'error');
+        });
+      } catch (e) {
+        handleRetryOrFail('exception');
       }
     }
 
     function sendStudentAction(actionId) {
       playSound('click');
-      const act = ACTION_META[actionId];
+      myPlannedAction = actionId;
+      const act = ACTION_META[actionId] || ACTION_META[2];
       const warTargetId = parseInt(document.getElementById('scWarTargetSelect').value, 10);
-      document.getElementById('scSelectedStatus').textContent = `현재 예약된 행동: ${act.name}`;
+      const payload = {
+        type: 'ACTION',
+        studentId: myStudentId,
+        actionId,
+        warTargetId
+      };
+
+      // 버튼 즉시 하이라이트 피드백
+      for (let i = 1; i <= 4; i++) {
+        const btn = document.getElementById(`scBtn${i}`);
+        const bdg = document.getElementById(`scBtn${i}Badge`);
+        if (!btn) continue;
+        if (actionId === i) {
+          btn.classList.add('ring-2', 'ring-amber-300', 'scale-[1.01]');
+          if (bdg) bdg.textContent = '✅ 선택됨';
+        } else {
+          btn.classList.remove('ring-2', 'ring-amber-300', 'scale-[1.01]');
+          if (bdg) bdg.textContent = '선택';
+        }
+      }
+
       if (clientConn && clientConn.open) {
-        clientConn.send({
-          type: 'ACTION',
-          studentId: myStudentId,
-          actionId,
-          warTargetId
-        });
+        clientConn.send(payload);
+        const titleEl = document.getElementById(`scBtn${actionId}Title`);
+        const label = actionId === 5
+          ? `${act.icon} 5. 이웃 국가 침략 전쟁 선포!`
+          : (titleEl ? titleEl.textContent : act.name);
+        document.getElementById('scSelectedStatus').textContent = `📡 전송 완료! 내 선택: ${label}`;
+      } else {
+        pendingStudentAction = payload;
+        updateStudentConnectionBadge(false, '🔄 재연결 및 전송 중...');
+        document.getElementById('scSelectedStatus').textContent =
+          `⏳ 중계방과 재연결하여 [${act.name}] 선택을 전송하고 있습니다...`;
+        if (myRoomCode) {
+          connectStudentPeerWithRetry(myRoomCode, myStudentId, 1, 3);
+        }
       }
     }
 
     window.addEventListener('DOMContentLoaded', () => {
       initGame();
+      initTeacherPeerHost();
       resizeCanvases();
       requestAnimationFrame(animateVisuals);
     });
