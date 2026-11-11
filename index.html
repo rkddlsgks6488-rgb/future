@@ -1,0 +1,3796 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>100년의 유산: 25개국 미래 생존 & 발전 대항전 (6학년 도덕 중계 시뮬레이터)</title>
+  <!-- Pretendard 한글 웹폰트 -->
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- PeerJS & MQTT.js CDN (교실 내 선생님 중계 화면 <-> 학생 기기 실시간 이중 연동용, 학교 방화벽 완벽 우회) -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="https://unpkg.com/mqtt@5.10.3/dist/mqtt.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'Roboto', 'sans-serif'],
+          },
+        }
+      }
+    };
+  </script>
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+    }
+    textarea, input, select {
+      user-select: text;
+    }
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: radial-gradient(circle at 50% 0%, #1e293b 0%, #0f172a 65%, #020617 100%);
+      color: #f8fafc;
+      overflow-x: hidden;
+    }
+
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.78);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.45);
+    }
+    .glass-card {
+      background: rgba(30, 41, 59, 0.72);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      transition: all 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    /* 화면 흔들림 (Screen Shake) */
+    @keyframes screenShakeHeavy {
+      0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+      12% { transform: translate3d(-10px, -6px, 0) rotate(-1deg); }
+      25% { transform: translate3d(10px, 5px, 0) rotate(1deg); }
+      37% { transform: translate3d(-8px, 5px, 0) rotate(-0.8deg); }
+      50% { transform: translate3d(8px, -4px, 0) rotate(0.8deg); }
+      62% { transform: translate3d(-5px, 3px, 0) rotate(-0.5deg); }
+      75% { transform: translate3d(5px, -3px, 0) rotate(0.4deg); }
+      87% { transform: translate3d(-2px, 1px, 0) rotate(0deg); }
+    }
+    @keyframes screenShakeDisaster {
+      0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+      10% { transform: translate3d(-14px, -8px, 0) rotate(-1.6deg) scale(1.01); }
+      22% { transform: translate3d(13px, 8px, 0) rotate(1.6deg) scale(0.99); }
+      35% { transform: translate3d(-11px, 6px, 0) rotate(-1.2deg); }
+      48% { transform: translate3d(11px, -6px, 0) rotate(1.2deg); }
+      62% { transform: translate3d(-7px, 4px, 0) rotate(-0.8deg); }
+      76% { transform: translate3d(6px, -3px, 0) rotate(0.6deg); }
+      90% { transform: translate3d(-3px, 2px, 0) rotate(-0.2deg); }
+    }
+    .shake-heavy {
+      animation: screenShakeHeavy 0.6s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+    }
+    .shake-disaster {
+      animation: screenShakeDisaster 0.85s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+    }
+
+    /* 오염도 70% 이상 붉은색 사이렌 경고등 (Vignette) */
+    @keyframes sirenPulse {
+      0%, 100% {
+        box-shadow: inset 0 0 60px 18px rgba(220, 38, 38, 0.22), inset 0 0 120px 35px rgba(185, 28, 28, 0.15);
+        opacity: 0.45;
+      }
+      50% {
+        box-shadow: inset 0 0 95px 36px rgba(239, 68, 68, 0.75), inset 0 0 180px 65px rgba(153, 27, 27, 0.5);
+        opacity: 1;
+      }
+    }
+    .siren-vignette {
+      pointer-events: none;
+      animation: sirenPulse 1.25s ease-in-out infinite;
+    }
+
+    /* 플로팅 텍스트 (Floating Text Juice) */
+    @keyframes floatUpFade {
+      0% {
+        opacity: 0;
+        transform: translate(-50%, 8px) scale(0.65);
+      }
+      18% {
+        opacity: 1;
+        transform: translate(-50%, -6px) scale(1.1);
+      }
+      35% {
+        transform: translate(-50%, -14px) scale(1);
+      }
+      100% {
+        opacity: 0;
+        transform: translate(-50%, -48px) scale(0.9);
+      }
+    }
+    .floating-juice {
+      position: absolute;
+      left: 50%;
+      top: 18%;
+      pointer-events: none;
+      white-space: nowrap;
+      font-weight: 900;
+      z-index: 60;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.95), 0 0 4px rgba(0, 0, 0, 0.98);
+      animation: floatUpFade 1.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
+    /* 25개국 영토 카드 스타일 */
+    .nation-tile {
+      position: relative;
+      border-radius: 14px;
+      transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+      cursor: pointer;
+    }
+    .nation-tile:hover {
+      transform: translateY(-5px) scale(1.04);
+      z-index: 35;
+    }
+    .nation-tile.selected-nation {
+      outline: 3px solid #fbbf24;
+      box-shadow: 0 0 22px rgba(251, 191, 36, 0.65);
+      z-index: 30;
+    }
+    .nation-tile.war-target-highlight {
+      outline: 3px dashed #ef4444;
+      animation: warTargetPulse 0.8s ease-in-out infinite;
+    }
+    @keyframes warTargetPulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 15px rgba(239, 68, 68, 0.6); }
+      50% { transform: scale(1.05); box-shadow: 0 0 28px rgba(239, 68, 68, 0.95); }
+    }
+
+    /* 스크롤바 */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.4);
+      border-radius: 8px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(100, 116, 139, 0.5);
+      border-radius: 8px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(148, 163, 184, 0.8);
+    }
+
+    /* 인쇄용 보고서 스타일 */
+    @media print {
+      body {
+        background: #ffffff !important;
+        color: #0f172a !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      #printReportArea {
+        display: block !important;
+        position: static !important;
+        background: #ffffff !important;
+        color: #0f172a !important;
+        box-shadow: none !important;
+        border: 2px solid #cbd5e1 !important;
+        padding: 20px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-emerald-500 selection:text-white">
+
+  <!-- 오염도 70% 이상일 때 작동하는 화면 전체 붉은색 사이렌 경고등 (Vignette) -->
+  <div id="sirenOverlay" class="fixed inset-0 z-40 hidden siren-vignette"></div>
+
+  <!-- 전쟁 / 자연재해 / 랜덤 이벤트 대형 속보 배너 -->
+  <div id="broadcastBanner" class="fixed top-16 left-1/2 -translate-x-1/2 z-50 hidden pointer-events-none transition-all duration-300 w-[92%] max-w-2xl">
+    <div id="broadcastBannerBox" class="bg-gradient-to-r from-red-900/95 via-red-600/95 to-amber-700/95 border-2 border-amber-300 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3.5">
+      <span id="broadcastBannerIcon" class="text-3xl sm:text-4xl shrink-0">⚔️</span>
+      <div>
+        <div id="broadcastBannerTitle" class="font-black text-base sm:text-lg tracking-tight">긴급 중계 속보!</div>
+        <div id="broadcastBannerDesc" class="text-xs sm:text-sm text-amber-100 mt-0.5">속보 내용이 여기에 표시됩니다.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 학생용 원격 컨트롤러 화면 (학생이 방 코드로 접속했을 때만 표시) ==================== -->
+  <div id="studentClientView" class="hidden min-h-screen flex-col justify-between p-4 max-w-md mx-auto w-full no-print">
+    <div class="glass-panel rounded-3xl p-5 border-2 border-emerald-500/40 flex flex-col gap-4 my-auto">
+      <div class="flex items-start justify-between gap-2 border-b border-slate-700 pb-3">
+        <div>
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="text-[11px] font-extrabold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">📱 학생 국가 원격 컨트롤러</span>
+            <span id="scTraitBadge" class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-400/30">국가 배정 완료</span>
+          </div>
+          <h2 id="scNationName" class="text-xl font-black text-white mt-1">내 국가: 연결 확인 중...</h2>
+        </div>
+        <div class="flex flex-col items-end gap-1 shrink-0">
+          <span id="scConnectionBadge" class="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/40">
+            🟢 중계방 연결됨
+          </span>
+          <button onclick="reopenStudentJoinModal()" class="text-[11px] font-extrabold px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-600">
+            🔄 방 코드/번호 변경
+          </button>
+        </div>
+      </div>
+
+      <!-- 내 국가 현재 수치 -->
+      <div class="grid grid-cols-3 gap-2 text-center">
+        <div class="bg-slate-900/90 p-2.5 rounded-xl border border-slate-700">
+          <div class="text-[11px] text-slate-400 font-bold">🌲 내 숲 나무</div>
+          <div id="scTrees" class="text-lg font-black text-emerald-400">100그루</div>
+        </div>
+        <div class="bg-slate-900/90 p-2.5 rounded-xl border border-slate-700">
+          <div class="text-[11px] text-slate-400 font-bold">💰 내 발전도</div>
+          <div id="scDev" class="text-lg font-black text-sky-400">0점</div>
+        </div>
+        <div class="bg-slate-900/90 p-2.5 rounded-xl border border-slate-700">
+          <div class="text-[11px] text-slate-400 font-bold">🌡️ 지구 오염도</div>
+          <div id="scPoll" class="text-lg font-black text-amber-300">0%</div>
+        </div>
+      </div>
+
+      <div class="bg-slate-900/80 p-3 rounded-xl border border-amber-500/30 text-xs text-slate-200 flex items-center justify-between gap-2">
+        <div>
+          <div id="scRoundInfoText" class="font-extrabold text-amber-300 mb-0.5">📢 이번 라운드 나의 정책 예약</div>
+          <div>선택한 정책이 선생님 전자칠판에 즉시 반영됩니다!</div>
+        </div>
+      </div>
+
+      <!-- 5가지 행동 선택 버튼 (국가별 고유 정책명 자동 동기화) -->
+      <div class="space-y-2">
+        <button id="scBtn1" onclick="sendStudentAction(1)" class="w-full text-left p-3 rounded-xl bg-rose-950/60 hover:bg-rose-900/80 border border-rose-500/50 flex items-center justify-between transition">
+          <div>
+            <div id="scBtn1Title" class="text-sm font-black text-white">🏭 1. 대규모 벌목 및 공장 가동</div>
+            <div id="scBtn1Delta" class="text-[11px] text-rose-200">나무 -30 | 발전도 +45 (대박 시 +60) | 오염 급증</div>
+          </div>
+          <span id="scBtn1Badge" class="text-xs font-extrabold text-rose-300 shrink-0 ml-2">선택</span>
+        </button>
+
+        <button id="scBtn2" onclick="sendStudentAction(2)" class="w-full text-left p-3 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-500/50 flex items-center justify-between transition">
+          <div>
+            <div id="scBtn2Title" class="text-sm font-black text-white">🏡 2. 적정 개발 및 생태 마을 (지속가능)</div>
+            <div id="scBtn2Delta" class="text-[11px] text-emerald-200">나무 -12 | 발전도 +25 | 숲 자연 재생 유지</div>
+          </div>
+          <span id="scBtn2Badge" class="text-xs font-extrabold text-emerald-300 shrink-0 ml-2">선택</span>
+        </button>
+
+        <button id="scBtn3" onclick="sendStudentAction(3)" class="w-full text-left p-3 rounded-xl bg-cyan-950/60 hover:bg-cyan-900/80 border border-cyan-500/50 flex items-center justify-between transition">
+          <div>
+            <div id="scBtn3Title" class="text-sm font-black text-white">☀️ 3. 친환경 에너지 & 나무 심기</div>
+            <div id="scBtn3Delta" class="text-[11px] text-cyan-200">나무 +20 | 발전도 +15 | 지구 오염도 정화!</div>
+          </div>
+          <span id="scBtn3Badge" class="text-xs font-extrabold text-cyan-300 shrink-0 ml-2">선택</span>
+        </button>
+
+        <button id="scBtn4" onclick="sendStudentAction(4)" class="w-full text-left p-3 rounded-xl bg-purple-950/60 hover:bg-purple-900/80 border border-purple-500/50 flex items-center justify-between transition">
+          <div>
+            <div id="scBtn4Title" class="text-sm font-black text-white">⚡ 4. 미래 자원 당겨쓰기 (유혹의 카드)</div>
+            <div id="scBtn4Delta" class="text-[11px] text-purple-200">나무 -10 | 발전도 +50 | 다음 세대 매 턴 -12점 부채!</div>
+          </div>
+          <span id="scBtn4Badge" class="text-xs font-extrabold text-purple-300 shrink-0 ml-2">선택</span>
+        </button>
+
+        <div id="scBtn5Box" class="pt-2 border-t border-slate-700 rounded-xl p-2 transition">
+          <label class="text-xs font-extrabold text-amber-300 block mb-1">⚔️ 5. 다른 국가에 자원 전쟁 선포하기</label>
+          <div class="flex gap-2">
+            <select id="scWarTargetSelect" onchange="if(myPlannedAction===5) sendStudentAction(5);" class="flex-1 bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-xs text-white">
+              <option value="-1">🎯 1등 국가 또는 랜덤 타깃 공격</option>
+            </select>
+            <button id="scBtn5" onclick="sendStudentAction(5)" class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-xs shrink-0">
+              ⚔️ 침략 발동!
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="scSelectedStatus" class="text-center text-xs font-extrabold text-amber-300 bg-slate-900 p-2.5 rounded-xl border border-slate-700">
+        현재 예약된 행동: 🏡 적정 개발 (기본값)
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 메인 교실 중계 화면 (선생님 전자칠판 & 전체 중계 대시보드) ==================== -->
+  <div id="gameRoot" class="w-full max-w-[1520px] mx-auto px-2.5 sm:px-4 py-2 flex-1 flex flex-col gap-2 no-print">
+
+    <!-- ==================== 1. 상단 헤더 & 지구 공동 4대 상태 지표 HUD ==================== -->
+    <header class="glass-panel rounded-2xl p-2.5 sm:p-3 flex flex-col gap-2">
+      <!-- 상단 타이틀 & 수업 관리 버튼 바 -->
+      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-700/60 pb-2">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center text-xl shadow-lg shadow-emerald-900/50">
+            🌍
+          </div>
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h1 class="text-sm sm:text-lg font-black tracking-tight text-white">
+                100년의 유산: 학급 미래 생존 & 발전 대항전 <span class="text-emerald-400 font-bold text-xs sm:text-sm">— 최대 30개국 실시간 중계</span>
+              </h1>
+              <span class="hidden xl:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                초등 6학년 도덕 07단원
+              </span>
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-400/40 shadow-sm">
+                ✨ 출처: 하모쌤
+              </span>
+            </div>
+            <p class="text-[11px] text-slate-400">
+              각자 발전도 1위를 향해 경쟁하고 전쟁도 일으킬 수 있지만, <strong class="text-rose-300">지구 공동 오염도가 100%가 되거나 숲이 모두 사라지면 다 함께 공멸</strong>합니다!
+            </p>
+          </div>
+        </div>
+
+        <!-- 우측 수업 도구 모음 -->
+        <div class="flex flex-wrap items-center gap-1.5">
+          <button onclick="reshuffleRealCountries()" class="px-2.5 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-400/40 transition flex items-center gap-1" title="학생들에게 실제 세계 국가를 다시 랜덤 배정합니다">
+            <span>🎲</span> <span>실제 국가 랜덤 재배정</span>
+          </button>
+          <button onclick="openSetupModal()" class="px-2.5 py-1.5 rounded-xl text-xs font-extrabold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/40 transition flex items-center gap-1">
+            <span>👥</span> <span id="headerStudentCountBtn">참여 인원 설정 (30명)</span>
+          </button>
+          <button onclick="openRoomModal()" class="px-2.5 py-1.5 rounded-xl text-xs font-extrabold bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-400/40 transition flex items-center gap-1">
+            <span>📡</span> <span id="headerRoomCodeText">학생 기기 접속코드</span>
+          </button>
+          <button onclick="openBriefingModal()" class="px-2.5 py-1.5 rounded-xl text-xs font-extrabold bg-purple-500/25 hover:bg-purple-500/35 text-purple-200 border border-purple-400/50 transition flex items-center gap-1">
+            <span>📖</span> <span>교사용 게임설명 & 규칙</span>
+          </button>
+          <button id="soundToggleBtn" onclick="toggleSound()" class="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-600/60 transition flex items-center gap-1">
+            <span id="soundIcon">🔊</span>
+          </button>
+          <button onclick="confirmRestart()" class="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-rose-950/70 hover:bg-rose-900/80 text-rose-200 border border-rose-700/50 transition">
+            🔄 초기화
+          </button>
+        </div>
+      </div>
+
+      <!-- 4대 핵심 지표 HUD -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+
+        <!-- 1) 현재 연도 · 세대 · 실시간 배속 컨트롤 -->
+        <div class="glass-card rounded-xl p-2.5 flex flex-col justify-between border-l-4 border-l-amber-400">
+          <div class="flex items-start justify-between gap-1">
+            <div>
+              <div class="flex items-center gap-1.5">
+                <span id="hudClockBadge" class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-black text-xs border border-amber-400/30">
+                  📅 1970년
+                </span>
+                <span id="hudTurnText" class="text-xs font-extrabold text-slate-200">
+                  1세대 (1 / 15 라운드)
+                </span>
+              </div>
+              <div id="hudGenName" class="text-xs sm:text-sm font-black text-white mt-1">
+                1세대: 할아버지·할머니 세대 👴
+              </div>
+            </div>
+
+            <!-- 자동 시간 흐름 배속 버튼 -->
+            <div class="flex items-center gap-1 bg-slate-900/90 p-1 rounded-lg border border-slate-700">
+              <button id="btnPause" onclick="setAutoFlowSpeed(0)" title="수동/일시정지 모드" class="px-1.5 py-0.5 rounded text-[11px] font-extrabold bg-amber-500 text-slate-950">⏸️ 수동</button>
+              <button id="btnSpeed1" onclick="setAutoFlowSpeed(1)" title="실시간 자동 흐름 (1배속)" class="px-1.5 py-0.5 rounded text-[11px] font-bold text-slate-300 hover:bg-slate-700">▶️ 1x</button>
+              <button id="btnSpeed2" onclick="setAutoFlowSpeed(2)" title="실시간 빠른 흐름 (2배속)" class="px-1.5 py-0.5 rounded text-[11px] font-bold text-slate-300 hover:bg-slate-700">⏩ 2x</button>
+            </div>
+          </div>
+
+          <div class="mt-1.5">
+            <div class="w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-700/80 mb-1">
+              <div id="timeProgressBar" class="h-full bg-gradient-to-r from-amber-400 to-emerald-400 transition-all duration-150" style="width: 0%;"></div>
+            </div>
+            <div class="grid gap-0.5" style="grid-template-columns: repeat(15, minmax(0, 1fr));" id="turnStepper"></div>
+          </div>
+        </div>
+
+        <!-- 2) 학급 전체 평균/총합 숲의 나무 -->
+        <div class="glass-card rounded-xl p-2.5 flex flex-col justify-between">
+          <div class="flex items-start justify-between">
+            <div>
+              <span class="text-[11px] font-bold text-emerald-300">
+                🌲 지구 평균 숲의 나무 <span class="text-[10px] text-slate-400 font-normal">(국가당 최대 150 / 0그루 시 멸망)</span>
+              </span>
+              <div class="flex items-baseline gap-1.5 mt-0.5">
+                <span id="hudAvgTreesValue" class="text-xl sm:text-2xl font-black text-emerald-400">100</span>
+                <span class="text-xs text-slate-400 font-semibold">그루 (생존국 <strong id="hudAliveCount" class="text-white">30</strong>/<span id="hudTotalCount">30</span>)</span>
+              </div>
+            </div>
+            <span class="text-2xl">🌲</span>
+          </div>
+          <div class="w-full h-2.5 bg-slate-900/90 rounded-full overflow-hidden border border-slate-700/80 my-1 p-0.5">
+            <div id="hudTreesBar" class="h-full rounded-full bg-gradient-to-r from-emerald-600 to-green-400 transition-all duration-300" style="width: 66.6%;"></div>
+          </div>
+          <div class="flex items-center justify-between text-[11px]">
+            <span id="hudRegenStatus" class="font-bold text-emerald-300">🌱 30그루↑ 국가: +20% 재생 / 30그루↓: +5%</span>
+          </div>
+        </div>
+
+        <!-- 3) 학급 평균 발전도 & 현재 1위 국가 -->
+        <div class="glass-card rounded-xl p-2.5 flex flex-col justify-between">
+          <div class="flex items-start justify-between">
+            <div>
+              <span class="text-[11px] font-bold text-sky-300">
+                💰 학급 평균 누적 발전도 <span class="text-[10px] text-slate-400 font-normal">(최종 목표: 300점 이상)</span>
+              </span>
+              <div class="flex items-baseline gap-1.5 mt-0.5">
+                <span id="hudAvgDevValue" class="text-xl sm:text-2xl font-black text-sky-400">0</span>
+                <span class="text-xs text-slate-400 font-semibold">/ 300 점</span>
+              </div>
+            </div>
+            <span class="text-2xl">🏆</span>
+          </div>
+          <div class="w-full h-2.5 bg-slate-900/90 rounded-full overflow-hidden border border-slate-700/80 my-1 p-0.5">
+            <div id="hudDevBar" class="h-full rounded-full bg-gradient-to-r from-sky-600 via-cyan-400 to-amber-300 transition-all duration-300" style="width: 0%;"></div>
+          </div>
+          <div class="flex items-center justify-between text-[11px] bg-slate-900/80 px-2 py-0.5 rounded border border-slate-800">
+            <span class="text-amber-300 font-bold truncate" id="hudTopLeaderText">🥇 현재 1위: 1번 학생 (0점)</span>
+            <span class="text-rose-300 font-bold shrink-0" id="hudWarCountText">⚔️ 누적 전쟁: 0회</span>
+          </div>
+        </div>
+
+        <!-- 4) 지구 공동 환경 오염도 (모두가 공유하는 운명 게이지!) -->
+        <div class="glass-card rounded-xl p-2.5 flex flex-col justify-between border-r-4 border-r-rose-500">
+          <div class="flex items-start justify-between">
+            <div>
+              <span class="text-[11px] font-bold text-rose-300">
+                🌡️ 지구 공동 환경 오염도 <span class="text-[10px] text-amber-300 font-bold">(100% 도달 시 전원 공멸!)</span>
+              </span>
+              <div class="flex items-baseline gap-1.5 mt-0.5">
+                <span id="hudPollValue" class="text-xl sm:text-2xl font-black text-teal-300">0%</span>
+                <span class="text-xs text-slate-400 font-semibold">/ 100%</span>
+              </div>
+            </div>
+            <span id="hudWeatherEmoji" class="text-2xl">🦋</span>
+          </div>
+          <div class="w-full h-2.5 bg-slate-900/90 rounded-full overflow-hidden border border-slate-700/80 my-1 p-0.5 relative">
+            <div class="absolute top-0 bottom-0 left-[50%] w-0.5 bg-amber-400/80 z-10"></div>
+            <div class="absolute top-0 bottom-0 left-[70%] w-0.5 bg-red-500/90 z-10"></div>
+            <div id="hudPollBar" class="h-full rounded-full bg-gradient-to-r from-teal-400 via-amber-500 to-red-600 transition-all duration-300" style="width: 0%;"></div>
+          </div>
+          <div class="flex items-center justify-between text-[11px]">
+            <span id="hudDisasterRisk" class="font-bold text-teal-300">🛡️ 자연재해 위험: 안전 (0%)</span>
+            <span id="hudSkyState" class="text-slate-400 font-medium">맑은 지구</span>
+          </div>
+        </div>
+
+      </div>
+    </header>
+
+    <!-- ==================== 2. 중앙 메인 중계 스테이지 (좌/중앙 8칼럼: 파노라마 스카이 + 25개국 영토 맵 / 우 4칼럼: 컨트롤러 & 실시간 랭킹 & 중계 로그) ==================== -->
+    <main class="grid grid-cols-1 lg:grid-cols-12 gap-2.5 flex-1">
+
+      <!-- 좌측/중앙 (8칼럼): 파노라마 지구 환경 뷰포트 + 최대 25개국 인터랙티브 대륙 영토 그리드 -->
+      <section class="lg:col-span-8 flex flex-col gap-2">
+
+        <!-- 상단: 실시간 지구 생태계 파노라마 디오라마 배너 + 이번 라운드 랜덤 이벤트 전광판 -->
+        <div class="glass-panel rounded-2xl p-2.5 relative overflow-hidden h-[135px] sm:h-[150px] flex flex-col justify-between" id="panoramaHeaderViewport">
+          <canvas id="panoramaCanvas" class="absolute inset-0 w-full h-full z-10 pointer-events-none"></canvas>
+
+          <div class="relative z-20 flex flex-wrap items-center justify-between gap-2">
+            <div class="bg-slate-950/80 backdrop-blur-md px-3 py-1 rounded-xl border border-slate-700/80 flex items-center gap-2">
+              <span id="eraBannerIcon" class="text-lg">🏞️</span>
+              <div>
+                <div id="eraBannerTitle" class="text-xs sm:text-sm font-black text-white">1970년: 1세대 산업화의 시작</div>
+                <div id="eraBannerSub" class="text-[11px] text-emerald-300">각 국가를 클릭해 정책·전쟁을 명령하거나 [라운드 동시 실행]을 눌러 중계를 시작하세요!</div>
+              </div>
+            </div>
+
+            <!-- 랜덤 글로벌 이벤트 배지 -->
+            <div class="bg-amber-950/90 backdrop-blur-md px-3 py-1 rounded-xl border border-amber-400/50 text-xs font-extrabold text-amber-200 flex items-center gap-1.5 shadow-lg">
+              <span>🎲</span>
+              <span id="randomEventBannerText">이번 라운드 랜덤 변수가 대기 중입니다!</span>
+            </div>
+          </div>
+
+          <!-- 하단 라운드 진행 액션 버튼 바 (선생님 중계 컨트롤) -->
+          <div class="relative z-20 flex flex-wrap items-center justify-between gap-2 bg-slate-950/85 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700/80">
+            <div class="flex flex-wrap items-center gap-1.5">
+              <button onclick="pickRandomSpotlightNation()" class="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-extrabold text-xs transition flex items-center gap-1 shadow">
+                <span>🎲</span> <span>랜덤 학생 지목 (발표/전쟁)</span>
+              </button>
+              <button onclick="assignRandomActionsToAll()" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-600 font-bold text-xs transition">
+                🔀 전체 국가 랜덤 성향 배정
+              </button>
+              <button onclick="setAllNationsAction(2)" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-600 font-bold text-xs transition hidden sm:inline-block">
+                🏡 전원 적정개발 기본값
+              </button>
+            </div>
+
+            <button id="btnExecuteRound" onclick="executeCurrentRound()" class="px-4 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 via-emerald-400 to-teal-400 hover:from-amber-300 hover:to-teal-300 text-slate-950 font-black text-xs sm:text-sm shadow-lg transition transform hover:scale-[1.02] flex items-center gap-1.5">
+              <span>⚡</span> <span id="btnExecuteRoundLabel">1라운드 실행 & 시간 흐름 중계!</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 중앙: 최대 25개국 실시간 영토 대륙 보드 (전쟁 포격 레이어 포함) -->
+        <div class="glass-panel rounded-2xl p-2.5 sm:p-3.5 flex-1 flex flex-col justify-between relative overflow-hidden min-h-[390px]" id="continentBoard">
+          <!-- 전쟁 포격/미사일 궤적 오버레이 Canvas -->
+          <canvas id="warEffectCanvas" class="absolute inset-0 w-full h-full pointer-events-none z-40"></canvas>
+
+          <!-- 30개국 영토 그리드 -->
+          <div id="nationsGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-6 gap-2 flex-1 relative z-20">
+            <!-- JS로 2~30개 학생 국가 영토 타일 렌더링 -->
+          </div>
+
+          <!-- 하단 범례 및 안내 -->
+          <div class="mt-2 pt-2 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-300">
+            <div class="flex flex-wrap items-center gap-2.5 font-bold">
+              <span>🌲 청정 숲 영토</span>
+              <span>🏡 생태 도시</span>
+              <span>☀️ 친환경 발전국</span>
+              <span>🏭 매연 공업국</span>
+              <span>🔥 전쟁·산불 피해국</span>
+              <span>🗿 멸망(나무 0그루)</span>
+            </div>
+            <div class="flex flex-wrap items-center gap-3">
+              <span class="text-amber-300 font-semibold">
+                👆 학생 영토를 클릭하면 우측 패널에서 해당 학생의 정책 선택 또는 <strong>⚔️ 전쟁 선포</strong>를 직접 조작할 수 있습니다!
+              </span>
+              <span class="px-2 py-0.5 rounded-lg bg-slate-800/90 border border-slate-700 text-emerald-300 font-extrabold text-[11px]">
+                📌 출처: 하모쌤
+              </span>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- 우측 (4칼럼): 선택된 학생 국가 명령 패널 + 실시간 1~25위 발전도 랭킹 + 중계 아나운서 로그 -->
+      <aside class="lg:col-span-4 flex flex-col gap-2">
+
+        <!-- 1) 선택된 학생 국가 상세 & 국가별 맞춤 정책/전쟁 명령 컨트롤러 -->
+        <div class="glass-panel rounded-2xl p-3 border-2 border-amber-400/45" id="selectedNationPanel">
+          <div class="flex items-center justify-between border-b border-slate-700/80 pb-2 mb-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <span id="selNationAvatar" class="text-3xl shrink-0">🇰🇷</span>
+              <div class="min-w-0">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span id="selNationRankBadge" class="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-400 text-slate-950">1위</span>
+                  <h2 id="selNationName" class="text-sm sm:text-base font-black text-white truncate">🇰🇷 대한민국 (1번)</h2>
+                  <span id="selNationTraitBadge" class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/40">
+                    첨단 IT·산림녹화
+                  </span>
+                </div>
+                <div id="selNationStatusText" class="text-[11px] text-emerald-300 font-semibold mt-0.5">
+                  🌲 나무 85그루 · 💰 발전도 35점 · ⚡ 부채 없음
+                </div>
+              </div>
+            </div>
+            <button onclick="pickRandomSpotlightNation()" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-amber-300 border border-slate-600 shrink-0">
+              🎲 랜덤 뽑기
+            </button>
+          </div>
+
+          <!-- 국가별 맞춤형 4가지 정책 선택 버튼 -->
+          <div class="text-[11px] font-bold text-slate-300 mb-1.5 flex items-center justify-between">
+            <span>👇 이 국가의 특성에 맞는 맞춤 정책을 선택하세요:</span>
+            <span id="selNationBonusHint" class="text-[10px] text-amber-300 font-extrabold">국가 고유 보너스 적용</span>
+          </div>
+          <div class="grid grid-cols-2 gap-1.5 mb-2">
+            <button onclick="setNationAction(state.selectedNationId, 1)" id="cmdBtn1" class="text-left p-2 rounded-xl border border-rose-500/40 bg-rose-950/40 hover:bg-rose-900/60 transition">
+              <div id="cmdBtn1Title" class="text-xs font-black text-rose-200 truncate">🏭 1. 대규모 벌목·공장</div>
+              <div id="cmdBtn1Delta" class="text-[10px] text-slate-300 mt-0.5 font-bold">🌲-30 · 💰+45 · 🌡️오염↑</div>
+            </button>
+            <button onclick="setNationAction(state.selectedNationId, 2)" id="cmdBtn2" class="text-left p-2 rounded-xl border border-emerald-500/40 bg-emerald-950/40 hover:bg-emerald-900/60 transition">
+              <div id="cmdBtn2Title" class="text-xs font-black text-emerald-200 truncate">🏡 2. 적정 개발 (지속가능)</div>
+              <div id="cmdBtn2Delta" class="text-[10px] text-slate-300 mt-0.5 font-bold">🌲-12 · 💰+25 · 재생유지</div>
+            </button>
+            <button onclick="setNationAction(state.selectedNationId, 3)" id="cmdBtn3" class="text-left p-2 rounded-xl border border-cyan-500/40 bg-cyan-950/40 hover:bg-cyan-900/60 transition">
+              <div id="cmdBtn3Title" class="text-xs font-black text-cyan-200 truncate">☀️ 3. 친환경 & 나무심기</div>
+              <div id="cmdBtn3Delta" class="text-[10px] text-slate-300 mt-0.5 font-bold">🌲+20 · 💰+15 · 🌡️정화!</div>
+            </button>
+            <button onclick="setNationAction(state.selectedNationId, 4)" id="cmdBtn4" class="text-left p-2 rounded-xl border border-purple-500/40 bg-purple-950/40 hover:bg-purple-900/60 transition">
+              <div id="cmdBtn4Title" class="text-xs font-black text-purple-200 truncate">⚡ 4. 미래 자원 당겨쓰기</div>
+              <div id="cmdBtn4Delta" class="text-[10px] text-slate-300 mt-0.5 font-bold">🌲-10 · 💰+50 · 💣부채!</div>
+            </button>
+          </div>
+
+          <!-- 5번: 전쟁 선포 & 즉시 주사위 전투 발동 섹션 -->
+          <div class="bg-red-950/50 border border-red-500/50 rounded-xl p-2 flex flex-col gap-1.5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-black text-red-300 flex items-center gap-1">
+                ⚔️ 5. 자원 침략 전쟁 (주사위 승부!)
+              </span>
+              <span class="text-[10px] text-red-200">승리 시 상대 💰35·🌲15 약탈 / 지구오염 급증!</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <select id="warTargetSelect" onchange="updateNationWarTarget(this.value)" class="flex-1 bg-slate-900 border border-red-500/50 rounded-lg px-2 py-1 text-xs text-white font-bold">
+                <!-- JS로 타깃 국가 목록 렌더링 -->
+              </select>
+              <button onclick="setNationAction(state.selectedNationId, 5)" id="cmdBtn5" class="px-2.5 py-1 rounded-lg bg-red-700 hover:bg-red-600 text-white font-extrabold text-xs shrink-0">
+                전쟁 예약
+              </button>
+              <button onclick="launchImmediateWarModal()" class="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shrink-0 shadow" title="지금 즉시 주사위를 굴려 이 학생의 전쟁을 중계합니다!">
+                🎲 즉시 전투!
+              </button>
+            </div>
+          </div>
+
+          <!-- 다음 라운드 진행 메인 버튼 (우측 패널 하단) -->
+          <div class="mt-2.5 pt-2.5 border-t border-slate-700/80 flex items-center gap-2">
+            <button onclick="selectNextStudentNation()" class="px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 font-bold text-xs shrink-0">
+              👉 다음 번호 학생
+            </button>
+            <button onclick="executeCurrentRound()" class="flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-400 via-emerald-400 to-teal-400 hover:from-amber-300 hover:to-teal-300 text-slate-950 font-black text-xs sm:text-sm shadow-lg transition transform hover:scale-[1.01] flex items-center justify-center gap-1.5">
+              <span>▶️</span> <span id="panelNextRoundBtnText">다음 라운드로 진행! (전체 결과 실행)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 2) 탭 전환: [🏆 실시간 발전도 랭킹 (1~25위)] vs [📜 실시간 중계 아나운서 로그] -->
+        <div class="glass-panel rounded-2xl p-3 flex-1 flex flex-col min-h-[270px] max-h-[420px] lg:max-h-none">
+          <div class="flex items-center justify-between border-b border-slate-700/80 pb-2 mb-2">
+            <div class="flex gap-1.5">
+              <button id="tabBtnRank" onclick="switchRightTab('rank')" class="px-3 py-1 rounded-lg text-xs font-black bg-amber-400 text-slate-950">
+                🏆 실시간 순위 (1~30위)
+              </button>
+              <button id="tabBtnLog" onclick="switchRightTab('log')" class="px-3 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700">
+                📜 중계 기록관 (<span id="logCountNum">0</span>)
+              </button>
+            </div>
+            <span class="text-[10px] text-slate-400 font-semibold">클릭 시 국가 선택</span>
+          </div>
+
+          <!-- 랭킹 리스트 뷰 -->
+          <div id="rankingListContainer" class="flex-1 overflow-y-auto space-y-1 pr-1 max-h-[290px]">
+            <!-- JS로 1위~25위 렌더링 -->
+          </div>
+
+          <!-- 중계 로그 뷰 -->
+          <div id="historyLogContainer" class="hidden flex-1 overflow-y-auto space-y-1.5 pr-1 max-h-[290px]">
+            <!-- JS로 라운드별 전쟁·재해·이벤트 중계 로그 렌더링 -->
+          </div>
+        </div>
+
+      </aside>
+    </main>
+  </div>
+
+  <!-- ==================== 모달 A: 🎲 실시간 주사위 전쟁 결투 모달 (War Dice Showdown) ==================== -->
+  <div id="warDiceModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/90 backdrop-blur-md no-print">
+    <div class="max-w-lg w-full glass-panel rounded-3xl p-6 border-2 border-red-500 shadow-2xl text-center">
+      <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/20 border border-red-400/50 text-red-300 text-xs font-black mb-2">
+        ⚔️ 자원 침략 전쟁 발발! (지구 공동 오염도 +8% 증가!)
+      </div>
+      <h2 class="text-2xl font-black text-white">운명의 주사위 대결!</h2>
+      <p class="text-xs text-slate-300 mt-1">
+        전쟁 포화로 양국 숲이 불타며(-10🌲) 지구 오염도가 치솟습니다! 과연 승자는 누구일까요?
+      </p>
+
+      <div class="grid grid-cols-2 gap-4 my-5 items-center">
+        <!-- 공격국 -->
+        <div class="bg-rose-950/70 p-4 rounded-2xl border-2 border-rose-500">
+          <div class="text-xs font-bold text-rose-300">⚔️ 침략 공격국</div>
+          <div id="warAttackerName" class="text-lg font-black text-white mt-0.5">1번 학생</div>
+          <div id="warAttackerDice" class="text-5xl my-3">🎲</div>
+          <div id="warAttackerPower" class="text-xs font-extrabold text-amber-300">주사위 대기 중</div>
+        </div>
+
+        <!-- 방어국 -->
+        <div class="bg-sky-950/70 p-4 rounded-2xl border-2 border-sky-500">
+          <div class="text-xs font-bold text-sky-300">🛡️ 영토 방어국</div>
+          <div id="warDefenderName" class="text-lg font-black text-white mt-0.5">2번 학생</div>
+          <div id="warDefenderDice" class="text-5xl my-3">🎲</div>
+          <div id="warDefenderPower" class="text-xs font-extrabold text-emerald-300">주사위 대기 중</div>
+        </div>
+      </div>
+
+      <div id="warResultBox" class="p-3.5 rounded-2xl bg-slate-900 border border-slate-700 text-sm font-bold text-slate-200 mb-5">
+        주사위가 구르고 있습니다...
+      </div>
+
+      <button id="warModalCloseBtn" onclick="closeWarDiceModal()" class="w-full py-3 rounded-2xl font-black text-base bg-gradient-to-r from-amber-400 to-rose-500 text-slate-950 shadow-lg">
+        확인 및 중계 복귀
+      </button>
+    </div>
+  </div>
+
+  <!-- ==================== 모달 B: 👥 참여 학생 수(2~30명) 및 이름 설정 모달 ==================== -->
+  <div id="setupModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/88 backdrop-blur-md no-print">
+    <div class="max-w-xl w-full glass-panel rounded-3xl p-6 border-2 border-amber-400/50 shadow-2xl">
+      <h2 class="text-xl font-black text-white flex items-center gap-2">
+        <span>👥</span> <span>학급 참여 인원 및 국가 이름 설정 (최대 30명)</span>
+      </h2>
+      <p class="text-xs text-slate-300 mt-1 mb-4">
+        교실 인원수(2명~30명)에 맞게 설정하세요. 학생 이름을 입력하면 각 영토에 실제 국가명과 함께 학생 이름이 표시됩니다.
+      </p>
+
+      <div class="mb-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+          <label class="text-xs font-extrabold text-amber-300">
+            참여 국가(학생/모둠) 수: <strong id="setupCountLabel" class="text-base text-white">30</strong>명
+          </label>
+          <div class="flex flex-wrap gap-1">
+            <button type="button" onclick="setQuickStudentCount(6)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-slate-200 border border-slate-600">6모둠</button>
+            <button type="button" onclick="setQuickStudentCount(15)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-slate-200 border border-slate-600">15명</button>
+            <button type="button" onclick="setQuickStudentCount(20)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-slate-200 border border-slate-600">20명</button>
+            <button type="button" onclick="setQuickStudentCount(25)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-slate-200 border border-slate-600">25명</button>
+            <button type="button" onclick="setQuickStudentCount(30)" class="px-2 py-0.5 rounded bg-emerald-600/40 hover:bg-emerald-500/50 text-[11px] font-extrabold text-emerald-200 border border-emerald-400/50">30명(전체)</button>
+          </div>
+        </div>
+        <input id="setupCountRange" type="range" min="2" max="30" value="30" oninput="document.getElementById('setupCountLabel').textContent = this.value" class="w-full accent-emerald-400 cursor-pointer" />
+        <div class="flex justify-between text-[10px] text-slate-400 mt-1">
+          <span>2명 (소규모/모둠)</span>
+          <span>10명</span>
+          <span>15명</span>
+          <span>20명</span>
+          <span>25명</span>
+          <span>30명 (학급 전체)</span>
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <label class="text-xs font-extrabold text-emerald-300 block mb-1">
+          학생/모둠 이름 목록 (쉼표 또는 줄바꿈으로 구분, 비워두면 '1번~30번'으로 자동 생성)
+        </label>
+        <textarea id="setupNamesInput" rows="4" placeholder="예: 김민준, 이서연, 박도윤, 최지우, 정하은 ..." class="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-400"></textarea>
+      </div>
+
+      <div class="flex justify-end gap-2">
+        <button onclick="closeSetupModal()" class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700">취소</button>
+        <button onclick="applyStudentSetup()" class="px-5 py-2 rounded-xl text-xs font-black bg-emerald-500 hover:bg-emerald-400 text-slate-950">적용하고 새 게임 시작</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 모달 C: 📡 실시간 방 코드 (선생님 중계 <-> 학생 기기 접속) 모달 ==================== -->
+  <div id="roomModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/88 backdrop-blur-md no-print">
+    <div class="max-w-lg w-full glass-panel rounded-3xl p-6 border-2 border-sky-400/50 shadow-2xl">
+      <h2 class="text-xl font-black text-white flex items-center gap-2">
+        <span>📡</span> <span>실시간 교실 중계방 & 학생 기기 연결</span>
+      </h2>
+      <p class="text-xs text-slate-300 mt-1 mb-4">
+        전자칠판 한 화면으로만 수업해도 완벽히 작동하며, 학생들이 각자 태블릿/폰으로 접속해 자기 국가를 직접 조종할 수도 있습니다!
+      </p>
+
+      <!-- 선생님 호스트 영역 -->
+      <div class="bg-slate-900/90 p-4 rounded-2xl border border-sky-500/40 mb-4">
+        <div class="text-xs font-extrabold text-sky-300 mb-1">🖥️ [선생님 전자칠판 중계 모드]</div>
+        <div class="flex items-center justify-between gap-2">
+          <div>
+            <div class="text-xs text-slate-400">현재 생성된 학급 방 코드:</div>
+            <div id="hostRoomCodeDisplay" class="text-3xl font-black text-amber-300 tracking-widest mt-0.5">생성 중...</div>
+          </div>
+          <button onclick="initTeacherPeerHost()" class="px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-extrabold">
+            🔄 방 코드 새로고침
+          </button>
+        </div>
+        <div id="hostConnectedCount" class="text-[11px] text-emerald-300 font-bold mt-2">
+          현재 기기로 접속한 학생: 0명 (나머지 국가는 전자칠판에서 직접/랜덤 조작 가능)
+        </div>
+      </div>
+
+      <!-- 학생 클라이언트 접속 영역 -->
+      <div class="bg-slate-900/90 p-4 rounded-2xl border border-emerald-500/40 mb-4">
+        <div class="text-xs font-extrabold text-emerald-300 mb-2">📱 [학생용 기기 접속하기] (학생 태블릿/PC에서 입력)</div>
+        <div class="grid grid-cols-2 gap-2 mb-2">
+          <input id="joinRoomCodeInput" type="text" maxlength="4" placeholder="방 코드 4자리 (예: 4821)" class="bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-xs text-white" />
+          <input id="joinStudentNumInput" type="number" min="1" max="30" placeholder="내 번호 (1~30)" class="bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-xs text-white" />
+        </div>
+        <div id="joinRoomStatusMsg" class="hidden text-xs font-extrabold px-3 py-2 rounded-xl mb-2 text-center"></div>
+        <button id="joinRoomBtn" onclick="joinAsStudentClient()" class="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition">
+          🚀 내 국가 원격 컨트롤러로 접속하기
+        </button>
+      </div>
+
+      <div class="flex justify-end">
+        <button onclick="closeRoomModal()" class="px-5 py-2 rounded-xl text-xs font-bold bg-slate-800 text-white hover:bg-slate-700">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 모달 1: 교사용 상세 진행 매뉴얼 & 학생용 게임 시작 브리핑 모달 (맨 앞 화면) ==================== -->
+  <div id="briefingModal" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/92 backdrop-blur-md no-print">
+    <div class="glass-panel max-w-4xl w-full rounded-3xl p-5 sm:p-7 border-2 border-emerald-500/45 shadow-2xl max-h-[94vh] overflow-y-auto">
+      <!-- 상단 헤더 -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-700/80 pb-4 mb-4">
+        <div class="flex items-center gap-3">
+          <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center text-3xl shadow-lg shrink-0">
+            🌍
+          </div>
+          <div>
+            <div class="flex flex-wrap items-center gap-1.5">
+              <span class="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                초등학교 6학년 도덕 · 07. 우리 모두의 미래를 위한 선택
+              </span>
+              <span class="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/40">
+                ✨ 출처: 하모쌤
+              </span>
+            </div>
+            <h2 class="text-lg sm:text-2xl font-black text-white mt-1">
+              100년의 유산: 최대 30개국 학급 미래 생존 & 발전 대항전
+            </h2>
+          </div>
+        </div>
+
+        <!-- 탭 전환 버튼: [👩‍🏫 교사용 진행 가이드] vs [👦👧 학생용 브리핑] -->
+        <div class="flex items-center gap-1.5 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-700 shrink-0 self-start sm:self-center">
+          <button id="briefTabTeacherBtn" onclick="switchBriefingTab('teacher')" class="px-3.5 py-2 rounded-xl text-xs font-black bg-amber-400 text-slate-950 transition flex items-center gap-1 shadow">
+            <span>👩‍🏫</span> <span>교사용 상세 설명서</span>
+          </button>
+          <button id="briefTabStudentBtn" onclick="switchBriefingTab('student')" class="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-300 hover:bg-slate-800 transition flex items-center gap-1">
+            <span>👦👧</span> <span>학생용 브리핑 화면</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ==================== 탭 1: 👩‍🏫 교사용 상세 게임 방식 & 수업 운영 가이드 (기본 표시) ==================== -->
+      <div id="briefingTeacherSection" class="space-y-4">
+        <!-- 1. 핵심 기획 의도 -->
+        <div class="bg-gradient-to-r from-emerald-950/90 via-slate-900/95 to-amber-950/80 border border-emerald-500/40 rounded-2xl p-4">
+          <div class="flex items-center justify-between flex-wrap gap-2 mb-1.5">
+            <h3 class="text-sm sm:text-base font-black text-emerald-300 flex items-center gap-1.5">
+              <span>💡</span> <span>1. 이 게임은 어떤 수업 자료인가요? (기획 의도 & 핵심 구조)</span>
+            </h3>
+            <span class="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/40">
+              권장 소요 시간: 20~35분 (총 15라운드)
+            </span>
+          </div>
+          <p class="text-xs sm:text-sm text-slate-200 leading-relaxed">
+            우리 반 학생들(최대 <strong>30명</strong> 또는 모둠)에게 <strong>실제 세계 30개국(대한민국🇰🇷, 미국🇺🇸, 브라질🇧🇷, 사우디🇸🇦, 투발루🇹🇻 등)</strong>이 무작위로 배정됩니다.
+            각 국가는 서로 다른 초기 자원(🌲나무·💰발전도)과 고유 정책을 가지고 <strong>100년(3세대 × 5라운드 = 총 15라운드)</strong> 동안 <strong>발전도 1위</strong>를 향해 경쟁하며, 다른 나라에 <strong>전쟁(⚔️)</strong>도 선포할 수 있습니다.<br />
+            <strong class="text-amber-300">★ 수업의 핵심 반전(공유지의 비극):</strong> 각자 1등을 차지하려고 무분별한 개발(🏭)과 전쟁(⚔️)을 일삼으면 학급 전체가 공유하는 <strong class="text-rose-300">🌡️ 지구 공동 환경 오염도</strong>가 치솟습니다. 오염도가 <strong>100%에 도달하면 현재 1등 국가가 누구든 상관없이 우리 반 전원이 즉시 공동 배드 엔딩(공멸)</strong>을 맞이하게 되어, 학생들 스스로 <em>"나만 1등하면 되는 게 아니라 지속가능한 협력과 절제가 필수구나!"</em>를 체득하게 됩니다.
+          </p>
+        </div>
+
+        <!-- 2. 교실 여건별 2가지 수업 진행 방식 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <!-- 방식 A: 전자칠판 단독 진행 -->
+          <div class="bg-slate-900/95 border-2 border-amber-400/40 rounded-2xl p-4">
+            <div class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[11px] font-black mb-1.5">
+              🖥️ 방식 A. 선생님 전자칠판(TV) 하나로 진행 (가장 간편·추천!)
+            </div>
+            <ol class="text-xs text-slate-200 space-y-1.5 leading-relaxed list-decimal list-inside">
+              <li>하단 <strong class="text-amber-300">[👥 참여 인원/이름 설정]</strong>에서 우리 반 인원(2~30명 또는 모둠)을 설정합니다.</li>
+              <li>매 라운드마다 화면 중앙의 <strong>학생 국가 타일을 클릭</strong>(또는 <strong class="text-purple-300">[🎲 랜덤 학생 지목]</strong> 클릭)하여 발표시킬 학생에게 <strong>1~4번 정책 또는 5번 전쟁</strong>을 물어보고 우측 패널에서 눌러줍니다.</li>
+              <li>모든 학생을 일일이 누르기 바쁠 때는 상단 <strong class="text-sky-300">[🔀 전체 국가 랜덤 성향 배정]</strong> 또는 <strong class="text-emerald-300">[🏡 전원 적정개발 기본값]</strong>을 누른 뒤, 희망하는 학생 몇 명만 바꿔주면 매우 빠르게 진행됩니다!</li>
+              <li>선택이 끝나면 우측 패널 하단의 <strong class="text-emerald-300">[▶️ 다음 라운드로 진행!]</strong> 버튼을 눌러 해당 라운드 결과를 동시 실행합니다.</li>
+            </ol>
+          </div>
+
+          <!-- 방식 B: 학생 태블릿/스마트폰 연동 -->
+          <div class="bg-slate-900/95 border-2 border-sky-400/40 rounded-2xl p-4">
+            <div class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 text-[11px] font-black mb-1.5">
+              📱 방식 B. 학생 개인 태블릿/스마트폰 원격 연동 (1인 1기기)
+            </div>
+            <ol class="text-xs text-slate-200 space-y-1.5 leading-relaxed list-decimal list-inside">
+              <li>선생님 화면 상단 <strong class="text-sky-300">[📡 학생 기기 접속코드]</strong> 버튼을 눌러 <strong>4자리 방 코드</strong>를 전자칠판에 띄웁니다.</li>
+              <li>학생들도 자기 태블릿/폰으로 <strong>같은 사이트 주소</strong>에 접속한 뒤, 상단 <strong class="text-sky-300">[📡 학생 기기 접속코드]</strong>를 누릅니다.</li>
+              <li>학생이 <strong>방 코드 4자리</strong>와 <strong>자기 번호(1~30번)</strong>를 입력하면 학생 기기가 <strong>내 국가 전용 리모컨</strong>으로 바뀝니다.</li>
+              <li>학생이 자기 기기에서 정책을 누르면 선생님 칠판 타일에 실시간으로 <span class="text-sky-300 font-bold">📱선택완료!</span>가 뜨며, 선생님이 <strong class="text-emerald-300">[▶️ 다음 라운드로 진행!]</strong>을 누르면 일괄 반영됩니다.</li>
+            </ol>
+          </div>
+        </div>
+
+        <!-- 3. 교사가 꼭 알아야 할 핵심 수치 & 게임 메커니즘 요약 -->
+        <div class="bg-slate-900/90 border border-slate-700 rounded-2xl p-4">
+          <h3 class="text-sm font-black text-white mb-2.5 flex items-center gap-1.5">
+            <span>⚙️</span> <span>3. 라운드별 작동 규칙 & 5가지 선택지 메커니즘 (교사용 요약)</span>
+          </h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 text-xs">
+            <div class="bg-slate-800/90 p-3 rounded-xl border border-slate-700">
+              <div class="font-extrabold text-emerald-300 mb-1">🌲 숲의 자연 재생 (20% vs 5%)</div>
+              <p class="text-slate-300 leading-relaxed">
+                매 라운드 종료 시 각 국가는 <strong>남은 나무의 20%가 자연 재생</strong>됩니다. 단, 벌목·전쟁으로 나무가 <strong>30그루 미만</strong>이 되면 재생력을 잃어 <strong>5%만 재생</strong>되며, <strong>0그루가 되면 즉시 국가 멸망(🗿)</strong> 처리됩니다.
+              </p>
+            </div>
+            <div class="bg-slate-800/90 p-3 rounded-xl border border-slate-700">
+              <div class="font-extrabold text-amber-300 mb-1">🏭 1~3번: 국가별 맞춤 정책</div>
+              <p class="text-slate-300 leading-relaxed">
+                • <strong>1번(과잉 개발):</strong> 발전도 급상승, 나무 급감, 지구 오염도 대폭 증가<br />
+                • <strong>2번(적정 개발):</strong> 20% 자연 재생 범위 내 지속가능 발전<br />
+                • <strong>3번(친환경 투자):</strong> 나무 회복 + <strong>지구 공동 오염도 정화(-15%~-20%)</strong>
+              </p>
+            </div>
+            <div class="bg-slate-800/90 p-3 rounded-xl border border-slate-700">
+              <div class="font-extrabold text-purple-300 mb-1">⚡ 4번: 미래 자원 당겨쓰기 (부채)</div>
+              <p class="text-slate-300 leading-relaxed">
+                현 세대에서 당장 큰 발전 점수(+50~64점)를 얻지만, 지구 오염도가 급증하고 <strong>다음 세대(5R·10R 세대교체 이후)부터 매 라운드 발전도 -12점 페널티</strong>가 후손에게 부과됩니다.
+              </p>
+            </div>
+            <div class="bg-slate-800/90 p-3 rounded-xl border border-slate-700">
+              <div class="font-extrabold text-rose-300 mb-1">⚔️ 5번: 침략 전쟁 & 주사위 승부</div>
+              <p class="text-slate-300 leading-relaxed">
+                타깃 국가와 주사위 대결을 벌여 승리 시 상대의 발전도(35점)·나무(15그루)를 약탈합니다. 단, <strong>승패와 무관하게 포화로 양국 숲이 불타고(-10~12그루) 지구 오염도가 급증</strong>합니다!
+              </p>
+            </div>
+            <div class="bg-slate-800/90 p-3 rounded-xl border border-slate-700">
+              <div class="font-extrabold text-red-300 mb-1">🌡️ 지구 오염도와 산불·산사태</div>
+              <p class="text-slate-300 leading-relaxed">
+                지구 공동 오염도가 <strong>50% 이상이면 매 라운드 40% 확률</strong>, <strong>70% 이상이면 80% 확률</strong>로 대형 산불·산사태가 발생해 학급 국가들의 나무가 -15그루씩 불타 사라집니다.
+              </p>
+            </div>
+            <div class="bg-slate-800/90 p-3 rounded-xl border border-slate-700">
+              <div class="font-extrabold text-sky-300 mb-1">🏁 4대 멀티 엔딩 & 성찰 보고서</div>
+              <p class="text-slate-300 leading-relaxed">
+                15라운드 종료 시 <strong>진 엔딩(푸른 기적) / 노멀 엔딩 / 배드 엔딩 1·2</strong>가 판정되며, 3대 부문 시상식과 함께 <strong>성찰 일기장 PDF 인쇄 / PNG 이미지 저장</strong>을 지원합니다.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== 탭 2: 👦👧 학생용 브리핑 화면 (이스터섬의 교훈) ==================== -->
+      <div id="briefingStudentSection" class="hidden space-y-4">
+        <div class="bg-slate-900/90 border border-amber-500/30 rounded-2xl p-4">
+          <h3 class="text-sm sm:text-base font-extrabold text-amber-300 flex items-center gap-1.5 mb-1.5">
+            <span>🏝️</span> <span>이스터섬의 교훈: "나만 1등하면 될까?"</span>
+          </h3>
+          <p class="text-xs sm:text-sm text-slate-200 leading-relaxed">
+            옛날 이스터섬의 부족들은 자기 부족의 <strong>모아이 석상</strong>을 더 크게 세우려고 경쟁적으로 숲의 나무를 베고 서로 다투었습니다.
+            결국 마지막 나무가 쓰러지자, <strong>1등 부족도 꼴등 부족도 모두 함께 삶의 터전을 잃고 멸망</strong>하고 말았습니다.<br />
+            오늘 우리 반(최대 30개 국가)은 각자 실제 세계 국가를 맡아 <strong>하나의 지구</strong> 위에서 100년(3세대, 15라운드) 동안 발전 경쟁을 시작합니다!
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+          <div class="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700">
+            <div class="font-extrabold text-amber-300 mb-1">🏆 1. 30개 실제 국가 배정 & 발전 경쟁</div>
+            <p class="text-slate-300 leading-relaxed">
+              각자 배정받은 국가의 특성에 맞춰 <strong>🌲 숲의 나무</strong>와 <strong>💰 국가 발전도</strong>를 관리하세요. 매 라운드 <strong>🎲 랜덤 시대 이벤트</strong>가 터지며 순위가 요동칩니다!
+            </p>
+          </div>
+          <div class="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700">
+            <div class="font-extrabold text-rose-300 mb-1">⚔️ 2. 자원 전쟁의 유혹과 무서운 대가</div>
+            <p class="text-slate-300 leading-relaxed">
+              다른 친구 나라에 <strong>전쟁(⚔️)</strong>을 걸어 주사위 대결에서 이기면 발전도와 나무를 빼앗지만, 전쟁 포화로 <strong>양국 숲이 불타고 지구 오염도가 급증</strong>합니다!
+            </p>
+          </div>
+          <div class="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700">
+            <div class="font-extrabold text-emerald-300 mb-1">🌲 3. 숲의 자연 재생과 탈락(0그루)</div>
+            <p class="text-slate-300 leading-relaxed">
+              매 라운드 남은 나무의 <strong>20%가 자연 재생</strong>됩니다(30그루 미만 시 <strong>5%로 급감</strong>). 내 나무가 0그루가 되면 그 나라는 <strong>즉시 멸망</strong>합니다!
+            </p>
+          </div>
+          <div class="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700">
+            <div class="font-extrabold text-sky-300 mb-1">🌍 4. 지구 공동 오염도와 다중 엔딩</div>
+            <p class="text-slate-300 leading-relaxed">
+              오염도가 50%·70%를 넘으면 <strong>산불·산사태</strong>가 우리 반 영토들을 덮치며, <strong>100%가 되면 1등이 누구든 학급 전원 공동 배드 엔딩</strong>을 맞이합니다!
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 하단 액션 버튼 바 -->
+      <div class="flex flex-wrap items-center justify-between gap-2 mt-5 pt-4 border-t border-slate-700/80">
+        <div class="flex flex-wrap items-center gap-2">
+          <button onclick="closeBriefingModal(); openSetupModal();" class="px-4 py-2.5 rounded-xl font-extrabold text-xs bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/50">
+            👥 학생 인원수(최대 30명)·이름 설정하기
+          </button>
+          <button onclick="switchBriefingTab('student')" id="briefSwitchToStudentHintBtn" class="px-3.5 py-2.5 rounded-xl font-bold text-xs bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-600">
+            👦👧 학생용 브리핑 화면 보기
+          </button>
+        </div>
+        <button onclick="closeBriefingModal()" class="px-7 py-3 rounded-2xl font-black text-sm sm:text-base bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-lg">
+          🌍 학급 대항전 중계 시작하기!
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 모달 2: 세대교체 모달 (5라운드 종료 시, 10라운드 종료 시) ==================== -->
+  <div id="generationModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/95 backdrop-blur-xl no-print">
+    <div class="max-w-xl w-full glass-panel rounded-3xl p-6 sm:p-8 border-2 border-amber-400/40 text-center shadow-2xl">
+      <div id="genModalEraBadge" class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-extrabold mb-3">
+        ⏳ 세대교체 (Generation Relay)
+      </div>
+      <h2 class="text-2xl sm:text-3xl font-black text-white">
+        "시간이 흘러 다음 세대로 바통을 넘깁니다..."
+      </h2>
+
+      <div class="flex items-center justify-center gap-4 my-5">
+        <div class="flex flex-col items-center">
+          <div id="genModalPrevIcon" class="w-14 h-14 rounded-2xl bg-slate-800 border border-slate-600 flex items-center justify-center text-3xl">👴</div>
+          <span id="genModalPrevLabel" class="text-xs font-bold text-slate-400 mt-1">1세대</span>
+        </div>
+        <div class="text-lg font-black text-amber-400 animate-pulse">━━ 세월의 흐름 ➔</div>
+        <div class="flex flex-col items-center">
+          <div id="genModalNextIcon" class="w-14 h-14 rounded-2xl bg-amber-500/25 border-2 border-amber-400 flex items-center justify-center text-3xl">🧑</div>
+          <span id="genModalNextLabel" class="text-xs font-extrabold text-amber-300 mt-1">2세대</span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 my-4 text-center">
+        <div class="bg-slate-900/90 p-3 rounded-xl border border-slate-700">
+          <div class="text-[11px] text-slate-400 font-bold">학급 평균 나무</div>
+          <div id="genModalTrees" class="text-lg font-black text-emerald-400 mt-0.5">100그루</div>
+        </div>
+        <div class="bg-slate-900/90 p-3 rounded-xl border border-slate-700">
+          <div class="text-[11px] text-slate-400 font-bold">지구 공동 오염도</div>
+          <div id="genModalPoll" class="text-lg font-black text-amber-400 mt-0.5">15%</div>
+        </div>
+        <div class="bg-slate-900/90 p-3 rounded-xl border border-slate-700">
+          <div class="text-[11px] text-slate-400 font-bold">학급 평균 발전도</div>
+          <div id="genModalDev" class="text-lg font-black text-sky-400 mt-0.5">110점</div>
+        </div>
+        <div class="bg-slate-900/90 p-3 rounded-xl border border-slate-700">
+          <div class="text-[11px] text-slate-400 font-bold">누적 전쟁 횟수</div>
+          <div id="genModalWars" class="text-lg font-black text-rose-400 mt-0.5">0회</div>
+        </div>
+      </div>
+
+      <div id="genModalFeedbackBox" class="p-4 rounded-2xl bg-slate-900/95 border-2 border-emerald-500/40 text-left mb-6">
+        <div id="genModalFeedbackTitle" class="text-sm font-extrabold text-emerald-300 mb-1">🌱 후손들에게 도착한 편지</div>
+        <p id="genModalFeedbackText" class="text-sm text-slate-200 leading-relaxed font-medium"></p>
+      </div>
+
+      <button onclick="confirmNextGeneration()" class="w-full py-3.5 rounded-2xl font-black text-base bg-gradient-to-r from-amber-400 to-emerald-400 text-slate-950 shadow-xl">
+        👉 다음 세대의 시대 시작하기
+      </button>
+    </div>
+  </div>
+
+  <!-- ==================== 모달 3: 다중 엔딩 & 학급 시상식 & 성찰 일기장 모달 ==================== -->
+  <div id="endingModal" class="fixed inset-0 z-50 hidden items-center justify-center p-3 sm:p-5 bg-slate-950/92 backdrop-blur-xl overflow-y-auto no-print">
+    <div class="max-w-3xl w-full glass-panel rounded-3xl p-5 sm:p-7 border-2 border-slate-600 shadow-2xl my-auto max-h-[94vh] overflow-y-auto">
+
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-700/80 pb-4">
+        <div class="flex items-center gap-3.5">
+          <div id="endingIconBox" class="w-16 h-16 rounded-2xl bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center text-4xl shrink-0">
+            🌟
+          </div>
+          <div>
+            <span id="endingTypeBadge" class="text-xs font-extrabold px-3 py-0.5 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-400/40">
+              진 엔딩 (True Ending)
+            </span>
+            <h2 id="endingTitle" class="text-2xl sm:text-3xl font-black text-white mt-1">
+              100년의 푸른 기적
+            </h2>
+          </div>
+        </div>
+        <button onclick="confirmRestart()" class="px-4 py-2 rounded-xl text-xs font-extrabold bg-slate-800 hover:bg-slate-700 text-white border border-slate-600 shrink-0">
+          🔄 새로운 학급 대항전 시작
+        </button>
+      </div>
+
+      <div id="endingStoryBox" class="my-4 p-4 rounded-2xl bg-slate-900/90 border border-slate-700 text-sm text-slate-200 leading-relaxed"></div>
+
+      <!-- 학급 부문별 시상식 (발전도 1위, 푸른 숲 지킴이 1위, 지속가능 균형상) -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-4">
+        <div class="bg-amber-950/40 p-3 rounded-2xl border border-amber-400/40">
+          <div class="text-xs font-extrabold text-amber-300">🥇 최고 발전 국가 (1위)</div>
+          <div id="awardTopDev" class="text-base font-black text-white mt-1">-</div>
+        </div>
+        <div class="bg-emerald-950/40 p-3 rounded-2xl border border-emerald-400/40">
+          <div class="text-xs font-extrabold text-emerald-300">🌲 최고의 숲 지킴이 상</div>
+          <div id="awardTopEco" class="text-base font-black text-white mt-1">-</div>
+        </div>
+        <div class="bg-sky-950/40 p-3 rounded-2xl border border-sky-400/40">
+          <div class="text-xs font-extrabold text-sky-300">⚖️ 지속가능 모범 국가상</div>
+          <div id="awardBalanced" class="text-base font-black text-white mt-1">-</div>
+        </div>
+      </div>
+
+      <!-- 지구 공동 최종 수치 -->
+      <div class="grid grid-cols-3 gap-2.5 mb-5 text-center">
+        <div class="bg-slate-900/85 p-3 rounded-2xl border border-slate-700">
+          <div class="text-xs text-slate-400 font-bold">🌲 학급 평균 남은 나무</div>
+          <div id="endingFinalTrees" class="text-lg font-black text-emerald-400 mt-0.5">100그루</div>
+        </div>
+        <div class="bg-slate-900/85 p-3 rounded-2xl border border-slate-700">
+          <div class="text-xs text-slate-400 font-bold">💰 학급 평균 발전도</div>
+          <div id="endingFinalDev" class="text-lg font-black text-sky-400 mt-0.5">300점</div>
+        </div>
+        <div class="bg-slate-900/85 p-3 rounded-2xl border border-slate-700">
+          <div class="text-xs text-slate-400 font-bold">🌡️ 최종 지구 오염도</div>
+          <div id="endingFinalPoll" class="text-lg font-black text-teal-300 mt-0.5">25%</div>
+        </div>
+      </div>
+
+      <!-- 성찰 일기장 -->
+      <div class="bg-slate-900/95 rounded-2xl p-4 sm:p-5 border-2 border-emerald-500/35">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-xl">✍️</span>
+          <h3 class="text-base font-black text-emerald-300">
+            [도덕 수업 성찰 일기장] 오늘 게임을 통해 깨달은 점과 미래 세대 지킴이 약속
+          </h3>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2.5">
+          <input id="studentGrade" type="text" placeholder="6학년" value="6학년" class="bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-xs text-white" />
+          <input id="studentClass" type="text" placeholder="반 (예: 1반)" class="bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-xs text-white" />
+          <input id="studentNumber" type="text" placeholder="번호" class="bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-xs text-white" />
+          <input id="studentName" type="text" placeholder="이름 또는 모둠명" class="bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-xs text-white" />
+        </div>
+        <textarea
+          id="reflectionText"
+          rows="3"
+          placeholder="예시) 내가 1등을 하려고 욕심을 부리거나 전쟁을 일으키면 결국 지구가 오염되어 모두가 위험해진다는 것을 깨달았습니다. 미래 세대를 위해 평화롭게 협력하고 환경을 아끼겠습니다!"
+          class="w-full bg-slate-800/95 border border-slate-600 rounded-xl p-3 text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none focus:border-emerald-400"
+        ></textarea>
+        <div class="flex justify-end mt-3">
+          <button onclick="openReportView()" class="px-5 py-2.5 rounded-xl font-black text-xs sm:text-sm bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 shadow-lg flex items-center gap-1.5">
+            <span>📋</span> <span>[결과 카드 저장/인쇄하기] 보고서 열기</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ==================== 모달 4: 인쇄/PNG 저장용 결과 보고서 ==================== -->
+  <div id="reportModal" class="fixed inset-0 z-50 hidden items-center justify-center p-3 sm:p-6 bg-slate-950/90 backdrop-blur-md overflow-y-auto">
+    <div class="max-w-3xl w-full bg-white text-slate-900 rounded-3xl p-6 sm:p-8 shadow-2xl my-auto border-4 border-emerald-600" id="printReportArea">
+      <div class="flex flex-wrap items-center justify-between gap-2 pb-4 mb-5 border-b border-slate-200 no-print">
+        <span class="text-xs font-extrabold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+          📄 학급 대항전 결과 및 성찰 보고서
+        </span>
+        <div class="flex items-center gap-2">
+          <button onclick="downloadReportImage()" class="px-3.5 py-2 rounded-xl text-xs font-extrabold bg-sky-600 hover:bg-sky-500 text-white">🖼️ 이미지(PNG) 저장</button>
+          <button onclick="window.print()" class="px-3.5 py-2 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-500 text-white">🖨️ 인쇄 / PDF 저장</button>
+          <button onclick="closeReportView()" class="px-3 py-2 rounded-xl text-xs font-bold bg-slate-200 text-slate-700">닫기</button>
+        </div>
+      </div>
+
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b-2 border-slate-800 pb-4 mb-5">
+        <div>
+          <div class="text-xs font-extrabold text-emerald-700">초등학교 6학년 도덕 · 07. 우리 모두의 미래를 위한 선택 | 출처: 하모쌤</div>
+          <h1 class="text-2xl font-black text-slate-900 mt-0.5">🌍 100년의 유산: 학급 미래 생존 대항전 보고서</h1>
+        </div>
+        <div class="text-right text-xs font-bold text-slate-700 bg-slate-100 px-3.5 py-2 rounded-xl border border-slate-300">
+          <div id="reportStudentInfo">6학년 반 번 이름</div>
+          <div id="reportDateInfo" class="text-[11px] text-slate-500 mt-0.5">작성일: -</div>
+        </div>
+      </div>
+
+      <div class="bg-slate-50 rounded-2xl p-4 border border-slate-200 mb-5">
+        <div class="flex items-center gap-3 mb-3">
+          <span id="reportEndingIcon" class="text-3xl">🌟</span>
+          <div>
+            <div id="reportEndingType" class="text-xs font-extrabold text-emerald-700">달성 엔딩</div>
+            <div id="reportEndingTitle" class="text-xl font-black text-slate-900">100년의 푸른 기적</div>
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-3 text-center">
+          <div class="bg-white p-3 rounded-xl border border-slate-200">
+            <div class="text-xs text-slate-500 font-bold">🌲 학급 평균 남은 나무</div>
+            <div id="reportTrees" class="text-lg font-black text-emerald-700 mt-0.5">100그루</div>
+          </div>
+          <div class="bg-white p-3 rounded-xl border border-slate-200">
+            <div class="text-xs text-slate-500 font-bold">💰 학급 평균 발전도</div>
+            <div id="reportDev" class="text-lg font-black text-sky-700 mt-0.5">300점</div>
+          </div>
+          <div class="bg-white p-3 rounded-xl border border-slate-200">
+            <div class="text-xs text-slate-500 font-bold">🌡️ 최종 지구 오염도</div>
+            <div id="reportPoll" class="text-lg font-black text-rose-700 mt-0.5">25%</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mb-5">
+        <h3 class="text-sm font-black text-slate-800 mb-2">🏆 우리 반 국가 최종 순위표 (상위 10개국 요약)</h3>
+        <div class="overflow-x-auto border border-slate-300 rounded-xl">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="bg-slate-100 text-slate-700 border-b border-slate-300">
+                <th class="py-1.5 px-2.5 font-extrabold">순위</th>
+                <th class="py-1.5 px-2.5 font-extrabold">국가(학생) 이름</th>
+                <th class="py-1.5 px-2.5 font-extrabold">최종 발전도</th>
+                <th class="py-1.5 px-2.5 font-extrabold">남은 숲의 나무</th>
+                <th class="py-1.5 px-2.5 font-extrabold">상태</th>
+              </tr>
+            </thead>
+            <tbody id="reportRankTableBody" class="divide-y divide-slate-200"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="bg-emerald-50/70 rounded-2xl p-4 border-2 border-emerald-600/40">
+        <h3 class="text-sm font-black text-emerald-900 mb-1.5">
+          🌱 오늘 게임을 통해 깨달은 점과 미래 세대 지킴이로서 내가 실천할 약속
+        </h3>
+        <p id="reportReflectionContent" class="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed min-h-[72px] bg-white p-3.5 rounded-xl border border-emerald-200"></p>
+      </div>
+      <div class="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between text-xs font-bold text-slate-500">
+        <span>초등학교 6학년 도덕 수업 자료 — 100년의 유산: 학급 미래 생존 대항전</span>
+        <span class="text-emerald-700 font-extrabold">출처: 하모쌤</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== JAVASCRIPT: 25개국 멀티 경쟁·전쟁·랜덤 이벤트·실시간 중계 엔진 ==================== -->
+  <script>
+    /*************************************************************************
+     * 1. 사운드 이펙트 합성기 (Web Audio API)
+     *************************************************************************/
+    let soundEnabled = true;
+    let audioCtx = null;
+
+    function getAudioCtx() {
+      if (!audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext) audioCtx = new AudioContext();
+      }
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      return audioCtx;
+    }
+
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      document.getElementById('soundIcon').textContent = soundEnabled ? '🔊' : '🔇';
+      if (soundEnabled) playSound('click');
+    }
+
+    function playSound(type) {
+      if (!soundEnabled) return;
+      const ctx = getAudioCtx();
+      if (!ctx) return;
+      const now = ctx.currentTime;
+
+      if (type === 'click') {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(600, now);
+        gain.gain.setValueAtTime(0.06, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.05);
+      } else if (type === 'war') {
+        // 포격/전쟁 사운드
+        [180, 120, 90, 60].forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(freq, now + i * 0.07);
+          gain.gain.setValueAtTime(0.16, now + i * 0.07);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.07 + 0.18);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + i * 0.07);
+          osc.stop(now + i * 0.07 + 0.18);
+        });
+      } else if (type === 'eco') {
+        [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + i * 0.055);
+          gain.gain.setValueAtTime(0.09, now + i * 0.055);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.055 + 0.25);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + i * 0.055);
+          osc.stop(now + i * 0.055 + 0.25);
+        });
+      } else if (type === 'disaster') {
+        [420, 280, 420, 250].forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(freq, now + i * 0.11);
+          gain.gain.setValueAtTime(0.11, now + i * 0.11);
+          gain.gain.exponentialRampToValueAtTime(0.005, now + i * 0.11 + 0.1);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + i * 0.11);
+          osc.stop(now + i * 0.11 + 0.11);
+        });
+      } else if (type === 'dice') {
+        [400, 600, 500, 750, 900].forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now + i * 0.05);
+          gain.gain.setValueAtTime(0.09, now + i * 0.05);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.05 + 0.08);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + i * 0.05);
+          osc.stop(now + i * 0.05 + 0.08);
+        });
+      }
+    }
+
+    /*************************************************************************
+     * 2. 세대 구분, 15라운드 연도, 랜덤 글로벌 이벤트 풀
+     *************************************************************************/
+    const GENERATIONS = {
+      1: { num: 1, title: '1세대', desc: '할아버지·할머니 세대 👴', icon: '👴', range: '1970~2003년' },
+      2: { num: 2, title: '2세대', desc: '부모님과 나의 세대 🧑', icon: '🧑', range: '2004~2036년' },
+      3: { num: 3, title: '3세대', desc: '미래의 후손 세대 👶', icon: '👶', range: '2037~2070년' }
+    };
+
+    const ROUND_YEARS = [1970, 1977, 1984, 1991, 1998, 2005, 2012, 2019, 2026, 2033, 2040, 2047, 2054, 2062, 2070];
+    const TOTAL_ROUNDS = 15;
+
+    const ACTION_META = {
+      1: { id: 1, icon: '🏭', short: '대규모 개발', name: '🏭 대규모 벌목·공장', badgeCls: 'bg-rose-500/25 text-rose-300 border-rose-500/40' },
+      2: { id: 2, icon: '🏡', short: '적정 개발', name: '🏡 적정 개발·생태마을', badgeCls: 'bg-emerald-500/25 text-emerald-300 border-emerald-500/40' },
+      3: { id: 3, icon: '☀️', short: '친환경 투자', name: '☀️ 친환경·나무심기', badgeCls: 'bg-cyan-500/25 text-cyan-300 border-cyan-500/40' },
+      4: { id: 4, icon: '⚡', short: '자원 당겨쓰기', name: '⚡ 미래 자원 당겨쓰기', badgeCls: 'bg-purple-500/25 text-purple-300 border-purple-500/40' },
+      5: { id: 5, icon: '⚔️', short: '전쟁 선포!', name: '⚔️ 이웃 국가 침략 전쟁', badgeCls: 'bg-red-600/40 text-red-200 border-red-400 animate-pulse' }
+    };
+
+    // 매 라운드 랜덤하게 발동하는 글로벌 시대 변수
+    const RANDOM_EVENTS_POOL = [
+      {
+        title: '🌿 유엔 기후 협약 포상금!',
+        desc: '숲의 나무가 90그루 이상인 친환경 국가들에 국제 격려금(발전도 +15점)이 지급됩니다!',
+        apply: (nations) => {
+          nations.forEach((n) => {
+            if (!n.isEliminated && n.trees >= 90) {
+              n.dev += 15;
+              spawnNationFloatingText(n.id, '+15 💰(기후포상)', 'text-emerald-300');
+            }
+          });
+        }
+      },
+      {
+        title: '💨 국제 탄소세 부과!',
+        desc: '이번 라운드에 대규모 벌목(🏭)을 강행한 국가들에 탄소 벌금(발전도 -12점)이 부과됩니다!',
+        apply: (nations) => {
+          nations.forEach((n) => {
+            if (!n.isEliminated && n.plannedAction === 1) {
+              n.dev = Math.max(0, n.dev - 12);
+              spawnNationFloatingText(n.id, '-12 💰(탄소세)', 'text-rose-400');
+            }
+          });
+        }
+      },
+      {
+        title: '☀️ 재생에너지 기술 대혁신!',
+        desc: '이번 라운드에 친환경 투자(☀️)를 선택한 국가들이 발전도 +15점 추가 대박을 터뜨립니다!',
+        apply: (nations) => {
+          nations.forEach((n) => {
+            if (!n.isEliminated && n.plannedAction === 3) {
+              n.dev += 15;
+              spawnNationFloatingText(n.id, '+15 💰(기술대박!)', 'text-cyan-300');
+            }
+          });
+        }
+      },
+      {
+        title: '🕊️ 세계 평화 연대 보너스!',
+        desc: '전쟁을 일으키지 않고 적정 개발(🏡)을 선택한 평화 국가들에 발전도 +10점과 나무 +5그루가 주어집니다!',
+        apply: (nations) => {
+          nations.forEach((n) => {
+            if (!n.isEliminated && n.plannedAction === 2) {
+              n.dev += 10;
+              n.trees = Math.min(150, n.trees + 5);
+              spawnNationFloatingText(n.id, '+10💰 +5🌲', 'text-lime-300');
+            }
+          });
+        }
+      },
+      {
+        title: '🪲 산림 해충 유행 주의보!',
+        desc: '생태계가 약해진 국가(나무 50그루 미만)에서 해충 피해로 나무 8그루가 추가 감소합니다!',
+        apply: (nations) => {
+          nations.forEach((n) => {
+            if (!n.isEliminated && n.trees < 50) {
+              n.trees = Math.max(0, n.trees - 8);
+              spawnNationFloatingText(n.id, '-8 🌲(해충)', 'text-amber-400');
+            }
+          });
+        }
+      }
+    ];
+
+    /*************************************************************************
+     * 3. 게임 전역 상태 (최대 30개 학생 국가)
+     *************************************************************************/
+    let studentCount = 30;
+    let customStudentNames = [];
+
+    let state = {
+      round: 1,              // 1 ~ 15
+      year: 1970,
+      generation: 1,         // 1 ~ 3
+      pollution: 0,          // 지구 공동 환경 오염도 (0 ~ 100%)
+      totalWars: 0,
+      nations: [],           // 2 ~ 25개 국가 배열
+      selectedNationId: 1,   // 현재 우측 컨트롤러에 선택된 국가 ID
+      autoSpeed: 0,          // 0: 수동, 1: 1배속 자동 진행, 2: 2배속 자동 진행
+      flowProgress: 0,       // 자동 진행 게이지 (0~100)
+      isExecuting: false,
+      isGameOver: false,
+      warLasers: []          // 전쟁 포격 궤적 애니메이션 배열
+    };
+
+    // 25개 실제 세계 국가 데이터 풀 (초기 나무·발전도 차별화 & 국가별 맞춤 4대 선택지)
+    const WORLD_COUNTRIES_POOL = [
+      {
+        flag: '🇰🇷', countryName: '대한민국', trait: '첨단 IT·산림녹화', initTrees: 88, initDev: 35,
+        choices: {
+          1: { title: '반도체·중화학 공단 대확장', trees: -28, dev: 52, poll: 20 },
+          2: { title: '스마트 그린도시 & 에코 교통', trees: -10, dev: 28, poll: 3 },
+          3: { title: '백두대간 산림복원 & 해상풍력', trees: 22, dev: 18, poll: -15 },
+          4: { title: '그린벨트 전면 해제 & 단기개발', trees: -12, dev: 55, poll: 26 }
+        }
+      },
+      {
+        flag: '🇺🇸', countryName: '미국', trait: '초강대국 산업·혁신', initTrees: 92, initDev: 45,
+        choices: {
+          1: { title: '셰일가스 시추 & 초대형 공장', trees: -32, dev: 56, poll: 24 },
+          2: { title: '친환경 실리콘밸리 혁신 타운', trees: -12, dev: 28, poll: 4 },
+          3: { title: '국립공원 보호 & 태양광 벨트', trees: 19, dev: 20, poll: -15 },
+          4: { title: '기후협약 탈퇴 & 화석연료 채굴', trees: -14, dev: 58, poll: 30 }
+        }
+      },
+      {
+        flag: '🇧🇷', countryName: '브라질', trait: '아마존 지구의 허파', initTrees: 140, initDev: 15,
+        choices: {
+          1: { title: '아마존 열대우림 벌목 & 목장 개간', trees: -36, dev: 52, poll: 25 },
+          2: { title: '원주민 공존 아사이베리 생태마을', trees: -10, dev: 26, poll: 2 },
+          3: { title: '아마존 지구의 허파 대복원', trees: 28, dev: 16, poll: -20 },
+          4: { title: '아마존 심층 금광·목재 불법채굴', trees: -16, dev: 54, poll: 28 }
+        }
+      },
+      {
+        flag: '🇩🇪', countryName: '독일', trait: '재생에너지 전환 선도', initTrees: 92, initDev: 38,
+        choices: {
+          1: { title: '루르 석탄발전 & 자동차 풀가동', trees: -28, dev: 50, poll: 22 },
+          2: { title: '프라이부르크 태양광 생태도시', trees: -10, dev: 29, poll: 2 },
+          3: { title: '에너지 전환 & 슈바르츠발트 숲복원', trees: 22, dev: 22, poll: -18 },
+          4: { title: '갈탄 광산 재가동 & 환경규제 유예', trees: -12, dev: 52, poll: 25 }
+        }
+      },
+      {
+        flag: '🇸🇦', countryName: '사우디아라비아', trait: '사막의 오일머니 왕국', initTrees: 52, initDev: 50,
+        choices: {
+          1: { title: '초대형 유전 증산 & 석유화학 단지', trees: -15, dev: 62, poll: 28 },
+          2: { title: '친환경 미래도시 네옴(NEOM) 건설', trees: -8, dev: 30, poll: 4 },
+          3: { title: '사막 태양광 & 그린 오아시스 식목', trees: 25, dev: 18, poll: -16 },
+          4: { title: '지하 원유·지하수 한계치 조기시추', trees: -10, dev: 64, poll: 32 }
+        }
+      },
+      {
+        flag: '🇨🇦', countryName: '캐나다', trait: '광활한 타이가 대삼림', initTrees: 135, initDev: 30,
+        choices: {
+          1: { title: '오일샌드 채굴 & 타이가 대벌목', trees: -32, dev: 50, poll: 22 },
+          2: { title: '산림인증 순환목재 & 수력 마을', trees: -10, dev: 27, poll: 3 },
+          3: { title: '로키산맥 보호림 & 청정 수력발전', trees: 24, dev: 17, poll: -16 },
+          4: { title: '북극권 영구동토층 자원 무리한 시추', trees: -14, dev: 53, poll: 27 }
+        }
+      },
+      {
+        flag: '🇨🇳', countryName: '중국', trait: '세계의 공장·메가 스케일', initTrees: 80, initDev: 32,
+        choices: {
+          1: { title: '초대형 제조공단 & 석탄발전 증설', trees: -34, dev: 58, poll: 26 },
+          2: { title: '스폰지 생태도시 & 전기철도망', trees: -12, dev: 28, poll: 5 },
+          3: { title: '녹색만리장성 방풍림 & 태양광 단지', trees: 25, dev: 19, poll: -16 },
+          4: { title: '희토류 광산 무제한 채굴 & 개발', trees: -14, dev: 58, poll: 30 }
+        }
+      },
+      {
+        flag: '🇳🇴', countryName: '노르웨이', trait: '피오르 수력·청정 복지국', initTrees: 118, initDev: 32,
+        choices: {
+          1: { title: '북해 해저 유전 대개발 & 조선업', trees: -24, dev: 48, poll: 18 },
+          2: { title: '피오르 수력 발전 & 전기차 마을', trees: -8, dev: 28, poll: 2 },
+          3: { title: '북유럽 침엽수림 복원 & 해상풍력', trees: 24, dev: 20, poll: -18 },
+          4: { title: '북극해 심해 석유 시추권 조기매각', trees: -10, dev: 52, poll: 24 }
+        }
+      },
+      {
+        flag: '🇯🇵', countryName: '일본', trait: '첨단 방재·하이브리드 기술', initTrees: 98, initDev: 36,
+        choices: {
+          1: { title: '연안 매립 중공업 단지 & 삼나무 벌목', trees: -26, dev: 48, poll: 19 },
+          2: { title: '에너지 절약형 스마트 에코 타운', trees: -10, dev: 28, poll: 3 },
+          3: { title: '산림 생태복원 & 지열·태양광 확대', trees: 21, dev: 18, poll: -15 },
+          4: { title: '해양 오염 방류 및 단기 산업부양', trees: -10, dev: 50, poll: 27 }
+        }
+      },
+      {
+        flag: '🇦🇺', countryName: '호주', trait: '태양의 대륙·광물 부국', initTrees: 95, initDev: 32,
+        choices: {
+          1: { title: '철광석·석탄 노천광산 대개발', trees: -30, dev: 54, poll: 23 },
+          2: { title: '코알라 숲 공존 생태 목장·마을', trees: -10, dev: 26, poll: 3 },
+          3: { title: '아웃백 태양광 & 유칼립투스 숲복원', trees: 22, dev: 19, poll: -16 },
+          4: { title: '대보초 연안 광물 무리한 채굴수출', trees: -12, dev: 55, poll: 27 }
+        }
+      },
+      {
+        flag: '🇮🇳', countryName: '인도', trait: '급성장 IT·태양광 신흥국', initTrees: 85, initDev: 22,
+        choices: {
+          1: { title: '대규모 제철·섬유 공단 & 산림 개간', trees: -30, dev: 50, poll: 22 },
+          2: { title: 'IT 테크밸리 & 태양광 마이크로 마을', trees: -11, dev: 27, poll: 4 },
+          3: { title: '갠지스강 정화 숲 & 초대형 태양광', trees: 23, dev: 18, poll: -16 },
+          4: { title: '지하수 무제한 양수 & 저가 석탄발전', trees: -12, dev: 52, poll: 26 }
+        }
+      },
+      {
+        flag: '🇨🇷', countryName: '코스타리카', trait: '군대 없는 생태관광 천국', initTrees: 128, initDev: 20,
+        choices: {
+          1: { title: '열대림 개간 대형 과일 플랜테이션', trees: -28, dev: 44, poll: 18 },
+          2: { title: '생태 관광 에코로지 & 커피 마을', trees: -6, dev: 32, poll: 1 },
+          3: { title: '국토 100% 재생에너지 & 우림 복원', trees: 26, dev: 19, poll: -19 },
+          4: { title: '보호구역 해제 후 대형 리조트 난개발', trees: -14, dev: 48, poll: 22 }
+        }
+      },
+      {
+        flag: '🇷🇺', countryName: '러시아', trait: '시베리아 대삼림·자원 대국', initTrees: 132, initDev: 28,
+        choices: {
+          1: { title: '시베리아 목재 대벌목 & 가스관 증설', trees: -35, dev: 52, poll: 23 },
+          2: { title: '바이칼 호수 보존형 산림 도시', trees: -12, dev: 25, poll: 4 },
+          3: { title: '시베리아 타이가 방화림 조림 & 풍력', trees: 24, dev: 15, poll: -15 },
+          4: { title: '북극권 석유 조기 채굴 & 중공업', trees: -14, dev: 55, poll: 28 }
+        }
+      },
+      {
+        flag: '🇮🇩', countryName: '인도네시아', trait: '열대우림·오랑우탄의 숲', initTrees: 125, initDev: 18,
+        choices: {
+          1: { title: '열대림 화전 개간 & 대규모 팜유농장', trees: -36, dev: 50, poll: 25 },
+          2: { title: '지속가능 팜유 인증 & 해양 생태마을', trees: -10, dev: 26, poll: 3 },
+          3: { title: '맹그로브 숲 대복원 & 화산 지열발전', trees: 26, dev: 17, poll: -18 },
+          4: { title: '배터리용 니켈 광산 무분별 채굴', trees: -15, dev: 53, poll: 27 }
+        }
+      },
+      {
+        flag: '🇨🇭', countryName: '스위스', trait: '알프스 청정 영세중립국', initTrees: 108, initDev: 36,
+        choices: {
+          1: { title: '알프스 산악 터널 굴착 & 기계공단', trees: -22, dev: 46, poll: 16 },
+          2: { title: '알프스 청정 낙농업 & 무공해 기차마을', trees: -8, dev: 29, poll: 2 },
+          3: { title: '빙하 보호 산림 복원 & 알프스 수력', trees: 21, dev: 19, poll: -17 },
+          4: { title: '산림 보호법 완화 & 대형 스키장 난개발', trees: -12, dev: 48, poll: 22 }
+        }
+      },
+      {
+        flag: '🇬🇧', countryName: '영국', trait: '산업혁명 발상지·해상풍력', initTrees: 78, initDev: 36,
+        choices: {
+          1: { title: '공업지대 재가동 & 대규모 택지개발', trees: -25, dev: 48, poll: 20 },
+          2: { title: '전원도시(Garden City) & 녹색 금융', trees: -10, dev: 28, poll: 3 },
+          3: { title: '북해 해상풍력 메가단지 & 숲 복원', trees: 22, dev: 20, poll: -17 },
+          4: { title: '북해 노후 유전 연장 & 환경예산 삭감', trees: -10, dev: 50, poll: 25 }
+        }
+      },
+      {
+        flag: '🇫🇷', countryName: '프랑스', trait: '저탄소 전력·문화 농업국', initTrees: 92, initDev: 34,
+        choices: {
+          1: { title: '대규모 산업단지 확장 & 물류기지', trees: -26, dev: 48, poll: 19 },
+          2: { title: '유기농 포도원 생태마을 & 자전거도시', trees: -10, dev: 27, poll: 3 },
+          3: { title: '도시 숲 조성 & 태양광·해양에너지', trees: 21, dev: 18, poll: -16 },
+          4: { title: '산림 상업 난개발 & 환경세 폐지', trees: -12, dev: 50, poll: 24 }
+        }
+      },
+      {
+        flag: '🇸🇪', countryName: '스웨덴', trait: '지속가능 임업·환경 선진국', initTrees: 122, initDev: 32,
+        choices: {
+          1: { title: '제지·철강 플랜트 증설 & 대벌목', trees: -28, dev: 48, poll: 18 },
+          2: { title: '베어낸 만큼 심는 순환형 목조마을', trees: -7, dev: 28, poll: 2 },
+          3: { title: '무화석 수소철강 & 북부 원시림 복원', trees: 24, dev: 19, poll: -18 },
+          4: { title: '북부 철광산 단기 집중 채굴', trees: -12, dev: 50, poll: 23 }
+        }
+      },
+      {
+        flag: '🇰🇪', countryName: '케냐', trait: '그린벨트 식목·지열 선도국', initTrees: 105, initDev: 16,
+        choices: {
+          1: { title: '사바나 삼림 벌목 & 대규모 수출농장', trees: -30, dev: 45, poll: 19 },
+          2: { title: '야생동물 공존 에코 사파리 마을', trees: -9, dev: 27, poll: 2 },
+          3: { title: '왕가리 마타이 그린벨트 식목 & 지열', trees: 27, dev: 17, poll: -18 },
+          4: { title: '국립공원 자원 반출 & 외국자본 난개발', trees: -14, dev: 49, poll: 24 }
+        }
+      },
+      {
+        flag: '🇳🇿', countryName: '뉴질랜드', trait: '청정 자연·생태 보전 섬', initTrees: 116, initDev: 28,
+        choices: {
+          1: { title: '대규모 기업형 목장 개간 & 목재수출', trees: -28, dev: 46, poll: 19 },
+          2: { title: '마오리 자연 공존 생태마을 & 청정농업', trees: -8, dev: 28, poll: 2 },
+          3: { title: '토종 카우리 숲 복원 & 지열·풍력', trees: 24, dev: 18, poll: -17 },
+          4: { title: '메탄가스 규제 철폐 & 해저광물 채굴', trees: -11, dev: 49, poll: 23 }
+        }
+      },
+      {
+        flag: '🇲🇽', countryName: '멕시코', trait: '마야 열대림·제조업 허브', initTrees: 100, initDev: 22,
+        choices: {
+          1: { title: '정글 관통 철도·공단 건설 & 벌목', trees: -30, dev: 48, poll: 21 },
+          2: { title: '전통 산림농업(아그로포레스트리) 마을', trees: -10, dev: 26, poll: 3 },
+          3: { title: '유카탄 마야 정글 복원 & 태양광', trees: 22, dev: 17, poll: -15 },
+          4: { title: '멕시코만 심해 유전 무리한 시추', trees: -12, dev: 51, poll: 26 }
+        }
+      },
+      {
+        flag: '🇿🇦', countryName: '남아프리카공화국', trait: '광물 자원·야생 생태 허브', initTrees: 88, initDev: 22,
+        choices: {
+          1: { title: '대형 금·백금 광산 확장 & 석탄발전', trees: -28, dev: 50, poll: 23 },
+          2: { title: '크루거 생태보호구 연계 친환경 마을', trees: -10, dev: 26, poll: 3 },
+          3: { title: '희귀 식물군 복원 & 태양광 발전단지', trees: 22, dev: 17, poll: -16 },
+          4: { title: '광산 폐수 정화 생략 & 조기 채굴', trees: -12, dev: 52, poll: 27 }
+        }
+      },
+      {
+        flag: '🇹🇷', countryName: '튀르키예', trait: '동서양 교차로·지중해 농업', initTrees: 90, initDev: 24,
+        choices: {
+          1: { title: '대규모 운하·시멘트 공단 & 벌목', trees: -28, dev: 49, poll: 21 },
+          2: { title: '지중해 올리브 친환경 생태 마을', trees: -10, dev: 26, poll: 3 },
+          3: { title: '지중해 소나무 숲 복원 & 지열·풍력', trees: 22, dev: 17, poll: -15 },
+          4: { title: '갈탄 광산 무리한 채굴 & 해안 난개발', trees: -12, dev: 51, poll: 25 }
+        }
+      },
+      {
+        flag: '🇨🇩', countryName: '콩고민주공화국', trait: '제2의 지구 허파·코발트 보고', initTrees: 138, initDev: 12,
+        choices: {
+          1: { title: '콩고 분지 원시림 벌목 & 광산 개발', trees: -36, dev: 50, poll: 24 },
+          2: { title: '고릴라 보호구역 공존 지속가능 마을', trees: -9, dev: 25, poll: 2 },
+          3: { title: '콩고 열대우림 보호림 복원 & 수력', trees: 28, dev: 16, poll: -19 },
+          4: { title: '배터리 코발트 광산 무제한 채굴', trees: -16, dev: 55, poll: 28 }
+        }
+      },
+      {
+        flag: '🇹🇻', countryName: '투발루', trait: '기후위기 최전선 산호초 섬', initTrees: 92, initDev: 14,
+        choices: {
+          1: { title: '해안 산호초·야자수림 무리한 개간', trees: -25, dev: 40, poll: 16 },
+          2: { title: '기후 회복력 에코 아일랜드 & 빗물마을', trees: -6, dev: 28, poll: 1 },
+          3: { title: '맹그로브 해안방어림 식목 & 태양광', trees: 25, dev: 20, poll: -19 },
+          4: { title: '배타적 경제수역 해저자원 조기매각', trees: -10, dev: 46, poll: 21 }
+        }
+      },
+      {
+        flag: '🇪🇬', countryName: '이집트', trait: '나일강 문명·사막 태양광', initTrees: 65, initDev: 24,
+        choices: {
+          1: { title: '나일강 삼각주 대규모 공단 & 수자원 전용', trees: -22, dev: 48, poll: 21 },
+          2: { title: '나일강 생태 관개농업 & 오아시스 마을', trees: -8, dev: 27, poll: 3 },
+          3: { title: '사하라 벤반 태양광 단지 & 사막 방풍림', trees: 23, dev: 19, poll: -16 },
+          4: { title: '지하 대수층 조기 고갈 & 무분별 관광개발', trees: -12, dev: 52, poll: 25 }
+        }
+      },
+      {
+        flag: '🇻🇳', countryName: '베트남', trait: '메콩강 삼각주·신흥 제조국', initTrees: 96, initDev: 22,
+        choices: {
+          1: { title: '글로벌 전자·섬유 공단 확장 & 산림개간', trees: -28, dev: 50, poll: 21 },
+          2: { title: '메콩강 친환경 수상 생태마을 & 커피농장', trees: -10, dev: 27, poll: 3 },
+          3: { title: '맹그로브 해안림 복원 & 해상풍력 발전', trees: 23, dev: 18, poll: -16 },
+          4: { title: '해안 모래·석탄 무제한 채굴 & 난개발', trees: -13, dev: 52, poll: 26 }
+        }
+      },
+      {
+        flag: '🇮🇸', countryName: '아이슬란드', trait: '100% 지열·수력 청정 화산섬', initTrees: 74, initDev: 34,
+        choices: {
+          1: { title: '대형 알루미늄 제련소 증설 & 해저개발', trees: -20, dev: 47, poll: 17 },
+          2: { title: '지열 온실 스마트팜 & 에코 온천마을', trees: -6, dev: 29, poll: 1 },
+          3: { title: '화산섬 자작나무 숲 복원 & 탄소포집(DAC)', trees: 24, dev: 20, poll: -20 },
+          4: { title: '빙하 지열원 과잉 시추 & 수산자원 남획', trees: -10, dev: 50, poll: 22 }
+        }
+      },
+      {
+        flag: '🇨🇱', countryName: '칠레', trait: '안데스 구리·리튬·파타고니아 숲', initTrees: 106, initDev: 25,
+        choices: {
+          1: { title: '아타카마 구리·리튬 광산 대확장', trees: -28, dev: 52, poll: 22 },
+          2: { title: '안데스 생태 포도원 & 청정 해안마을', trees: -9, dev: 27, poll: 3 },
+          3: { title: '파타고니아 원시림 보호 & 사막 태양광', trees: 24, dev: 18, poll: -17 },
+          4: { title: '염호 지하수 고갈 리튬 무제한 채굴', trees: -13, dev: 54, poll: 27 }
+        }
+      },
+      {
+        flag: '🇫🇮', countryName: '핀란드', trait: '천 개의 호수와 자작나무 숲', initTrees: 128, initDev: 33,
+        choices: {
+          1: { title: '대형 펄프·제지 공단 증설 & 침엽수 벌목', trees: -28, dev: 48, poll: 18 },
+          2: { title: '호수 생태계 공존 스마트 목조 교육도시', trees: -7, dev: 29, poll: 2 },
+          3: { title: '북극권 타이가 원시림 복원 & 바이오에너지', trees: 24, dev: 19, poll: -18 },
+          4: { title: '이탄지(토탄) 대규모 채굴 & 산림 조기벌채', trees: -12, dev: 51, poll: 24 }
+        }
+      }
+    ];
+
+    function shuffleArray(arr) {
+      const copy = [...arr];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    }
+
+    function createNations(count, namesList) {
+      const shuffledCountries = shuffleArray(WORLD_COUNTRIES_POOL);
+      const arr = [];
+      for (let i = 1; i <= count; i++) {
+        const cData = shuffledCountries[(i - 1) % shuffledCountries.length];
+        const customStudent = namesList[i - 1] ? namesList[i - 1].trim() : `${i}번`;
+        const displayName = `${cData.flag} ${cData.countryName} (${customStudent})`;
+        const isPeerConnected = Boolean(
+          typeof studentConnections !== 'undefined' &&
+          studentConnections[i] &&
+          studentConnections[i].open
+        );
+        const defaultAction = 2;
+
+        arr.push({
+          id: i,
+          name: displayName,
+          shortCountry: `${cData.flag} ${cData.countryName}`,
+          studentLabel: customStudent,
+          flag: cData.flag,
+          trait: cData.trait,
+          choices: cData.choices,
+          trees: cData.initTrees,
+          dev: cData.initDev,
+          activeDebtStacks: 0,
+          nextGenDebtStacks: 0,
+          plannedAction: defaultAction,
+          warTargetId: -1,
+          terrainType: cData.initTrees >= 115 ? 'forest' : (cData.initDev >= 40 ? 'factory' : 'village'),
+          isEliminated: false,
+          connectedPeer: isPeerConnected
+        });
+      }
+      return arr;
+    }
+
+    function reshuffleRealCountries() {
+      playSound('dice');
+      initGame();
+      showBroadcastBanner('🎲', `${studentCount}개 실제 세계 국가 랜덤 배정 완료!`, '각 학생에게 새로운 실제 국가와 고유 초기 자원(🌲나무·💰발전도) 및 국가별 맞춤 선택지가 배정되었습니다!');
+    }
+
+    function initGame() {
+      state.round = 1;
+      state.year = ROUND_YEARS[0];
+      state.generation = 1;
+      state.pollution = 0;
+      state.totalWars = 0;
+      state.nations = createNations(studentCount, customStudentNames);
+      state.selectedNationId = 1;
+      state.autoSpeed = 0;
+      state.flowProgress = 0;
+      state.isExecuting = false;
+      state.isGameOver = false;
+      state.warLasers = [];
+
+      document.getElementById('endingModal').classList.add('hidden');
+      document.getElementById('endingModal').classList.remove('flex');
+      document.getElementById('generationModal').classList.add('hidden');
+      document.getElementById('generationModal').classList.remove('flex');
+      document.getElementById('reportModal').classList.add('hidden');
+      document.getElementById('reportModal').classList.remove('flex');
+
+      document.getElementById('headerStudentCountBtn').textContent = `참여 국가 설정 (${studentCount}명)`;
+
+      const logBox = document.getElementById('historyLogContainer');
+      logBox.innerHTML = `
+        <div class="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700 text-xs text-slate-200">
+          <div class="font-extrabold text-emerald-300 mb-0.5">🌍 1970년: ${studentCount}개국 미래 생존 대항전 개막!</div>
+          각 국가(학생)는 나무 100그루를 가지고 출발합니다. 발전도 1위를 노리되 지구 오염도(100% 시 공멸)를 조심하세요!
+        </div>
+      `;
+      document.getElementById('logCountNum').textContent = '1';
+
+      updateAutoSpeedUI();
+      renderAll();
+    }
+
+    function confirmRestart() {
+      playSound('click');
+      initGame();
+    }
+
+    /*************************************************************************
+     * 4. 학생 인원/이름 설정 모달
+     *************************************************************************/
+    function openSetupModal() {
+      playSound('click');
+      document.getElementById('setupCountRange').value = studentCount;
+      document.getElementById('setupCountLabel').textContent = studentCount;
+      document.getElementById('setupNamesInput').value = customStudentNames.join(', ');
+      const m = document.getElementById('setupModal');
+      m.classList.remove('hidden');
+      m.classList.add('flex');
+    }
+
+    function closeSetupModal() {
+      const m = document.getElementById('setupModal');
+      m.classList.add('hidden');
+      m.classList.remove('flex');
+    }
+
+    function setQuickStudentCount(val) {
+      playSound('click');
+      document.getElementById('setupCountRange').value = val;
+      document.getElementById('setupCountLabel').textContent = val;
+    }
+
+    function applyStudentSetup() {
+      playSound('eco');
+      studentCount = Math.max(2, Math.min(30, parseInt(document.getElementById('setupCountRange').value, 10) || 30));
+      const raw = document.getElementById('setupNamesInput').value.trim();
+      customStudentNames = raw ? raw.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean) : [];
+      closeSetupModal();
+      initGame();
+    }
+
+    function switchBriefingTab(tab) {
+      playSound('click');
+      const tSec = document.getElementById('briefingTeacherSection');
+      const sSec = document.getElementById('briefingStudentSection');
+      const tBtn = document.getElementById('briefTabTeacherBtn');
+      const sBtn = document.getElementById('briefTabStudentBtn');
+      const hintBtn = document.getElementById('briefSwitchToStudentHintBtn');
+
+      if (tab === 'teacher') {
+        tSec.classList.remove('hidden');
+        sSec.classList.add('hidden');
+        tBtn.className = 'px-3.5 py-2 rounded-xl text-xs font-black bg-amber-400 text-slate-950 transition flex items-center gap-1 shadow';
+        sBtn.className = 'px-3.5 py-2 rounded-xl text-xs font-bold text-slate-300 hover:bg-slate-800 transition flex items-center gap-1';
+        if (hintBtn) {
+          hintBtn.textContent = '👦👧 학생용 브리핑 화면 보기';
+          hintBtn.onclick = () => switchBriefingTab('student');
+        }
+      } else {
+        tSec.classList.add('hidden');
+        sSec.classList.remove('hidden');
+        sBtn.className = 'px-3.5 py-2 rounded-xl text-xs font-black bg-emerald-400 text-slate-950 transition flex items-center gap-1 shadow';
+        tBtn.className = 'px-3.5 py-2 rounded-xl text-xs font-bold text-slate-300 hover:bg-slate-800 transition flex items-center gap-1';
+        if (hintBtn) {
+          hintBtn.textContent = '👩‍🏫 교사용 상세 설명서 보기';
+          hintBtn.onclick = () => switchBriefingTab('teacher');
+        }
+      }
+    }
+
+    function openBriefingModal() {
+      playSound('click');
+      const m = document.getElementById('briefingModal');
+      m.classList.remove('hidden');
+      m.classList.add('flex');
+    }
+
+    function closeBriefingModal() {
+      playSound('eco');
+      const m = document.getElementById('briefingModal');
+      m.classList.add('hidden');
+      m.classList.remove('flex');
+    }
+
+    /*************************************************************************
+     * 5. 렌더링: 상단 HUD, 25개국 대륙 그리드, 우측 선택 컨트롤러, 실시간 랭킹
+     *************************************************************************/
+    function renderAll() {
+      renderHUD();
+      renderNationsGrid();
+      renderSelectedNationPanel();
+      renderRankingBoard();
+      broadcastStateToStudents();
+    }
+
+    function getAliveNations() {
+      return state.nations.filter((n) => !n.isEliminated);
+    }
+
+    function getSortedRanks() {
+      return [...state.nations].sort((a, b) => {
+        if (a.isEliminated !== b.isEliminated) return a.isEliminated ? 1 : -1;
+        if (b.dev !== a.dev) return b.dev - a.dev;
+        return b.trees - a.trees;
+      });
+    }
+
+    function renderHUD() {
+      const genInfo = GENERATIONS[state.generation];
+      document.getElementById('hudClockBadge').textContent = `📅 ${state.year}년`;
+      document.getElementById('hudTurnText').textContent = `${genInfo.title} (${state.round} / ${TOTAL_ROUNDS} 라운드)`;
+      document.getElementById('hudGenName').textContent = `${genInfo.title}: ${genInfo.desc}`;
+
+      document.getElementById('eraBannerTitle').textContent =
+        `${state.year}년 (${genInfo.title} · ${state.round}/${TOTAL_ROUNDS} 라운드)`;
+      document.getElementById('btnExecuteRoundLabel').textContent =
+        `${state.round}라운드(${state.year}년) 결과 실행 & 중계!`;
+      const panelNextBtn = document.getElementById('panelNextRoundBtnText');
+      if (panelNextBtn) {
+        panelNextBtn.textContent = `${state.round}라운드 실행 ➔ 다음 라운드 진행!`;
+      }
+
+      // 15라운드 스텝퍼
+      const stepper = document.getElementById('turnStepper');
+      stepper.innerHTML = '';
+      for (let r = 1; r <= TOTAL_ROUNDS; r++) {
+        const d = document.createElement('div');
+        let cls = 'h-1.5 rounded-sm transition-all ';
+        if (r < state.round) cls += r <= 5 ? 'bg-emerald-400' : (r <= 10 ? 'bg-sky-400' : 'bg-amber-400');
+        else if (r === state.round && !state.isGameOver) cls += 'bg-white animate-pulse ring-1 ring-amber-300';
+        else cls += 'bg-slate-700/80';
+        d.className = cls;
+        stepper.appendChild(d);
+      }
+
+      // 평균 나무 & 생존 국가 수
+      const alive = getAliveNations();
+      const avgTrees = alive.length > 0
+        ? Math.round(alive.reduce((sum, n) => sum + n.trees, 0) / alive.length)
+        : 0;
+      document.getElementById('hudAvgTreesValue').textContent = avgTrees;
+      document.getElementById('hudAliveCount').textContent = alive.length;
+      document.getElementById('hudTotalCount').textContent = state.nations.length;
+      document.getElementById('hudTreesBar').style.width = `${Math.min(100, (avgTrees / 150) * 100)}%`;
+
+      // 평균 발전도 & 현재 1위
+      const avgDev = state.nations.length > 0
+        ? Math.round(state.nations.reduce((sum, n) => sum + n.dev, 0) / state.nations.length)
+        : 0;
+      document.getElementById('hudAvgDevValue').textContent = avgDev;
+      document.getElementById('hudDevBar').style.width = `${Math.min(100, (avgDev / 300) * 100)}%`;
+
+      const ranked = getSortedRanks();
+      if (ranked[0]) {
+        document.getElementById('hudTopLeaderText').textContent = `🥇 1위: ${ranked[0].name} (${ranked[0].dev}점)`;
+      }
+      document.getElementById('hudWarCountText').textContent = `⚔️ 전쟁: ${state.totalWars}회`;
+
+      // 지구 공동 오염도
+      const pollVal = document.getElementById('hudPollValue');
+      const pollBar = document.getElementById('hudPollBar');
+      const disRisk = document.getElementById('hudDisasterRisk');
+      const skyState = document.getElementById('hudSkyState');
+      const weatherEmoji = document.getElementById('hudWeatherEmoji');
+      const siren = document.getElementById('sirenOverlay');
+
+      pollVal.textContent = `${state.pollution}%`;
+      pollBar.style.width = `${Math.min(100, state.pollution)}%`;
+
+      if (state.pollution >= 70) {
+        siren.classList.remove('hidden');
+        pollVal.className = 'text-xl sm:text-2xl font-black text-rose-400 animate-pulse';
+        disRisk.textContent = '🚨 재해 경보: 80% 확률 (대형 산불·산사태!)';
+        disRisk.className = 'font-extrabold text-rose-400';
+        skyState.textContent = '멸망 위기 경보!';
+        weatherEmoji.textContent = '🔥';
+      } else {
+        siren.classList.add('hidden');
+        if (state.pollution >= 50) {
+          pollVal.className = 'text-xl sm:text-2xl font-black text-amber-400';
+          disRisk.textContent = '⚠️ 재해 주의: 40% 확률 (산불·산사태)';
+          disRisk.className = 'font-extrabold text-amber-300';
+          skyState.textContent = '스모그 주의보';
+          weatherEmoji.textContent = '🌫️';
+        } else if (state.pollution >= 31) {
+          pollVal.className = 'text-xl sm:text-2xl font-black text-yellow-300';
+          disRisk.textContent = '🛡️ 재해 확률: 0% (50% 도달 시 위험)';
+          disRisk.className = 'font-bold text-yellow-200';
+          skyState.textContent = '미세먼지 발생';
+          weatherEmoji.textContent = '☁️';
+        } else {
+          pollVal.className = 'text-xl sm:text-2xl font-black text-teal-300';
+          disRisk.textContent = '🛡️ 자연재해 위험: 안전 (0%)';
+          disRisk.className = 'font-bold text-teal-300';
+          skyState.textContent = '맑은 지구';
+          weatherEmoji.textContent = '🦋';
+        }
+      }
+    }
+
+    function renderNationsGrid() {
+      const grid = document.getElementById('nationsGrid');
+      grid.innerHTML = '';
+
+      const ranked = getSortedRanks();
+      const rankMap = {};
+      ranked.forEach((n, idx) => { rankMap[n.id] = idx + 1; });
+
+      // 현재 선택된 국가가 전쟁(5번)을 골랐을 때 타깃 표시
+      const selNation = state.nations.find((n) => n.id === state.selectedNationId);
+      const highlightedWarTargetId = (selNation && selNation.plannedAction === 5) ? selNation.warTargetId : null;
+
+      state.nations.forEach((nation) => {
+        const rank = rankMap[nation.id];
+        const act = ACTION_META[nation.plannedAction];
+        const isSelected = nation.id === state.selectedNationId;
+        const isWarTarget = nation.id === highlightedWarTargetId;
+
+        // 영토 배경색 & 아이콘 결정
+        let bgStyle = '';
+        let borderCls = 'border border-slate-600/80';
+        let terrainEmoji = '🌲';
+
+        if (nation.isEliminated || nation.trees <= 0) {
+          bgStyle = 'background: linear-gradient(145deg, #292524 0%, #1c1917 100%); opacity: 0.72;';
+          borderCls = 'border border-rose-900';
+          terrainEmoji = '🗿';
+        } else if (nation.terrainType === 'burned') {
+          bgStyle = 'background: linear-gradient(145deg, #7f1d1d 0%, #450a0a 100%);';
+          borderCls = 'border border-red-500/70';
+          terrainEmoji = '🔥';
+        } else if (nation.terrainType === 'factory') {
+          bgStyle = 'background: linear-gradient(145deg, #334155 0%, #1e293b 100%);';
+          borderCls = 'border border-amber-500/50';
+          terrainEmoji = '🏭';
+        } else if (nation.terrainType === 'eco') {
+          bgStyle = 'background: linear-gradient(145deg, #0d9488 0%, #115e59 100%);';
+          borderCls = 'border border-cyan-400/70';
+          terrainEmoji = '☀️';
+        } else if (nation.terrainType === 'village') {
+          bgStyle = state.pollution >= 60
+            ? 'background: linear-gradient(145deg, #57534e 0%, #44403c 100%);'
+            : 'background: linear-gradient(145deg, #15803d 0%, #166534 100%);';
+          borderCls = 'border border-lime-400/60';
+          terrainEmoji = '🏡';
+        } else {
+          bgStyle = state.pollution >= 60
+            ? 'background: linear-gradient(145deg, #57534e 0%, #44403c 100%);'
+            : 'background: linear-gradient(145deg, #059669 0%, #065f46 100%);';
+          borderCls = 'border border-emerald-400/60';
+          terrainEmoji = nation.trees < 30 ? '🪵' : '🌲';
+        }
+
+        const card = document.createElement('div');
+        card.id = `nation-tile-${nation.id}`;
+        card.className = `nation-tile p-2 flex flex-col justify-between min-h-[82px] ${borderCls} ${isSelected ? 'selected-nation' : ''} ${isWarTarget ? 'war-target-highlight' : ''}`;
+        card.style.cssText = bgStyle;
+        card.onclick = () => selectNationTile(nation.id);
+
+        const rankBadgeCls = rank === 1
+          ? 'bg-amber-400 text-slate-950 font-black'
+          : (rank <= 3 ? 'bg-slate-200 text-slate-900 font-extrabold' : 'bg-slate-900/80 text-slate-300 font-bold');
+
+        const debtDot = nation.activeDebtStacks > 0
+          ? `<span class="text-[9px] px-1 rounded bg-purple-600 text-white font-bold" title="환경 부채 페널티 적용 중">⚡부채</span>`
+          : '';
+
+        const customChoice = nation.choices && nation.choices[nation.plannedAction];
+        const plannedLabel = nation.plannedAction === 5
+          ? `${act.icon} 침략 전쟁 선포!`
+          : (customChoice ? `${act.icon} ${customChoice.title}` : `${act.icon} ${act.short}`);
+
+        card.innerHTML = `
+          <div class="flex items-center justify-between gap-1">
+            <div class="flex items-center gap-1 min-w-0">
+              <span class="text-[10px] px-1.5 py-0.2 rounded ${rankBadgeCls} shrink-0">${rank}위</span>
+              <span class="text-xs font-black text-white truncate">${nation.name}</span>
+            </div>
+            <span class="text-base shrink-0">${terrainEmoji}</span>
+          </div>
+
+          <div class="text-[10px] text-amber-200/90 font-semibold truncate">${nation.trait || ''}</div>
+
+          <div class="my-0.5 flex items-center justify-between text-[11px] font-extrabold">
+            <span class="${nation.trees < 30 ? 'text-rose-300 animate-pulse' : 'text-emerald-200'}">🌲 ${nation.trees}</span>
+            <span class="text-sky-200">💰 ${nation.dev}점</span>
+          </div>
+
+          <div class="flex items-center justify-between gap-1">
+            <span class="text-[10px] font-extrabold px-1.5 py-0.5 rounded border ${act.badgeCls} truncate w-full text-center" title="${plannedLabel}">
+              ${nation.isEliminated ? '💀 이스터섬 멸망' : plannedLabel}
+            </span>
+            ${debtDot}
+          </div>
+        `;
+
+        grid.appendChild(card);
+      });
+    }
+
+    function selectNationTile(nationId) {
+      playSound('click');
+      state.selectedNationId = nationId;
+      renderAll();
+    }
+
+    function selectNextStudentNation() {
+      playSound('click');
+      const total = state.nations.length;
+      state.selectedNationId = (state.selectedNationId % total) + 1;
+      renderAll();
+    }
+
+    function renderSelectedNationPanel() {
+      const nation = state.nations.find((n) => n.id === state.selectedNationId) || state.nations[0];
+      if (!nation) return;
+
+      const ranked = getSortedRanks();
+      const rank = ranked.findIndex((n) => n.id === nation.id) + 1;
+
+      document.getElementById('selNationAvatar').textContent = nation.flag || '🏳️';
+      document.getElementById('selNationRankBadge').textContent = `${rank}위`;
+      document.getElementById('selNationName').textContent = nation.name;
+      const traitEl = document.getElementById('selNationTraitBadge');
+      if (traitEl) traitEl.textContent = nation.trait || '특성 국가';
+
+      const debtInfo = nation.activeDebtStacks > 0
+        ? `⚡환경부채(-${nation.activeDebtStacks * 12}점/턴)`
+        : (nation.nextGenDebtStacks > 0 ? '💣다음세대 부채예약' : '부채 없음');
+      document.getElementById('selNationStatusText').textContent =
+        `🌲 나무 ${nation.trees}그루 · 💰 발전도 ${nation.dev}점 · ${debtInfo}`;
+
+      // 국가별 맞춤 선택지 제목 및 수치 업데이트
+      if (nation.choices) {
+        const icons = { 1: '🏭', 2: '🏡', 3: '☀️', 4: '⚡' };
+        for (let c = 1; c <= 4; c++) {
+          const ch = nation.choices[c];
+          const tEl = document.getElementById(`cmdBtn${c}Title`);
+          const dEl = document.getElementById(`cmdBtn${c}Delta`);
+          if (tEl && ch) tEl.textContent = `${icons[c]} ${c}. ${ch.title}`;
+          if (dEl && ch) {
+            const trSign = ch.trees >= 0 ? `+${ch.trees}` : ch.trees;
+            const plSign = ch.poll >= 0 ? `+${ch.poll}%` : `${ch.poll}%`;
+            const extra = c === 4 ? ' · 💣부채' : '';
+            dEl.textContent = `🌲${trSign} · 💰+${ch.dev} · 🌡️${plSign}${extra}`;
+          }
+        }
+      }
+
+      // 버튼 선택 하이라이트
+      for (let i = 1; i <= 5; i++) {
+        const btn = document.getElementById(`cmdBtn${i}`);
+        if (!btn) continue;
+        if (nation.plannedAction === i) {
+          btn.classList.add('ring-2', 'ring-amber-300', 'scale-[1.02]');
+        } else {
+          btn.classList.remove('ring-2', 'ring-amber-300', 'scale-[1.02]');
+        }
+      }
+
+      // 전쟁 타깃 드롭다운 업데이트
+      const select = document.getElementById('warTargetSelect');
+      select.innerHTML = `<option value="-1">🎯 1등 국가 또는 랜덤 경쟁국 공격</option>`;
+      state.nations.forEach((other) => {
+        if (other.id !== nation.id && !other.isEliminated) {
+          const opt = document.createElement('option');
+          opt.value = other.id;
+          opt.textContent = `🎯 ${other.name} (💰${other.dev}점 · 🌲${other.trees}그루)`;
+          if (Number(nation.warTargetId) === other.id) opt.selected = true;
+          select.appendChild(opt);
+        }
+      });
+    }
+
+    function renderRankingBoard() {
+      const box = document.getElementById('rankingListContainer');
+      box.innerHTML = '';
+      const ranked = getSortedRanks();
+
+      ranked.forEach((n, idx) => {
+        const rank = idx + 1;
+        const row = document.createElement('div');
+        const isSel = n.id === state.selectedNationId;
+        row.className = `p-2 rounded-xl border flex items-center justify-between text-xs cursor-pointer transition ${
+          isSel ? 'bg-amber-500/20 border-amber-400' : 'bg-slate-900/80 border-slate-800 hover:bg-slate-800'
+        }`;
+        row.onclick = () => selectNationTile(n.id);
+
+        const medal = rank === 1 ? '🥇' : (rank === 2 ? '🥈' : (rank === 3 ? '🥉' : `${rank}위`));
+        const act = ACTION_META[n.plannedAction];
+
+        row.innerHTML = `
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="font-black text-amber-300 w-7 shrink-0">${medal}</span>
+            <span class="font-bold text-white truncate">${n.name}</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded border ${act.badgeCls}">${act.icon}</span>
+          </div>
+          <div class="flex items-center gap-2.5 shrink-0 font-extrabold">
+            <span class="text-emerald-300">🌲${n.trees}</span>
+            <span class="text-sky-300 w-14 text-right">💰${n.dev}점</span>
+          </div>
+        `;
+        box.appendChild(row);
+      });
+    }
+
+    function switchRightTab(tab) {
+      playSound('click');
+      const rankBox = document.getElementById('rankingListContainer');
+      const logBox = document.getElementById('historyLogContainer');
+      const btnRank = document.getElementById('tabBtnRank');
+      const btnLog = document.getElementById('tabBtnLog');
+
+      if (tab === 'rank') {
+        rankBox.classList.remove('hidden');
+        logBox.classList.add('hidden');
+        btnRank.className = 'px-3 py-1 rounded-lg text-xs font-black bg-amber-400 text-slate-950';
+        btnLog.className = 'px-3 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700';
+      } else {
+        rankBox.classList.add('hidden');
+        logBox.classList.remove('hidden');
+        btnLog.className = 'px-3 py-1 rounded-lg text-xs font-black bg-amber-400 text-slate-950';
+        btnRank.className = 'px-3 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700';
+      }
+    }
+
+    /*************************************************************************
+     * 6. 국가별 행동 지정, 랜덤 학생 지목, 즉시 주사위 전쟁 결투
+     *************************************************************************/
+    function setNationAction(nationId, actionId) {
+      playSound('click');
+      const nation = state.nations.find((n) => n.id === nationId);
+      if (!nation || nation.isEliminated) return;
+      nation.plannedAction = actionId;
+      if (actionId === 5) {
+        const targetSelect = document.getElementById('warTargetSelect');
+        if (targetSelect) nation.warTargetId = parseInt(targetSelect.value, 10);
+      }
+      renderAll();
+    }
+
+    function updateNationWarTarget(targetVal) {
+      const nation = state.nations.find((n) => n.id === state.selectedNationId);
+      if (!nation) return;
+      nation.warTargetId = parseInt(targetVal, 10);
+      nation.plannedAction = 5;
+      renderAll();
+    }
+
+    function setAllNationsAction(actionId) {
+      playSound('click');
+      state.nations.forEach((n) => {
+        if (!n.isEliminated) n.plannedAction = actionId;
+      });
+      renderAll();
+    }
+
+    function assignRandomActionsToAll() {
+      playSound('dice');
+      state.nations.forEach((n) => {
+        if (n.isEliminated || n.connectedPeer) return;
+        const r = Math.random();
+        if (r < 0.25) n.plannedAction = 1;      // 25% 대규모 개발
+        else if (r < 0.62) n.plannedAction = 2; // 37% 적정 개발
+        else if (r < 0.82) n.plannedAction = 3; // 20% 친환경 투자
+        else if (r < 0.90) n.plannedAction = 4; // 8% 미래 자원 당겨쓰기
+        else {
+          n.plannedAction = 5;                  // 10% 전쟁 선포!
+          n.warTargetId = -1;
+        }
+      });
+      showBroadcastBanner('🎲', '전체 국가 랜덤 성향 배정 완료!', '각 학생 국가의 이번 라운드 행동과 전쟁 여부가 흥미진진하게 배정되었습니다!');
+      renderAll();
+    }
+
+    function pickRandomSpotlightNation() {
+      playSound('dice');
+      const alive = getAliveNations();
+      if (alive.length === 0) return;
+      const pick = alive[Math.floor(Math.random() * alive.length)];
+      state.selectedNationId = pick.id;
+      renderAll();
+      spawnNationFloatingText(pick.id, '🎯 발표 지목!', 'text-amber-300');
+      showBroadcastBanner('🎯', `스포트라이트 지목: [${pick.name}]!`, `${pick.name} 학생(모둠)은 이번 라운드에 어떤 선택(개발·친환경·전쟁)을 할지 결정해 주세요!`);
+    }
+
+    // 즉시 주사위 전쟁 모달 실행 (교실 발표용 하이라이트!)
+    function launchImmediateWarModal() {
+      const attacker = state.nations.find((n) => n.id === state.selectedNationId);
+      if (!attacker || attacker.isEliminated) return;
+
+      const defender = pickWarDefender(attacker);
+      if (!defender) return;
+
+      playSound('war');
+      triggerScreenShake('heavy');
+      fireWarLaserBetween(attacker.id, defender.id);
+
+      const modal = document.getElementById('warDiceModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+
+      document.getElementById('warAttackerName').textContent = attacker.name;
+      document.getElementById('warDefenderName').textContent = defender.name;
+      document.getElementById('warAttackerDice').textContent = '🎲';
+      document.getElementById('warDefenderDice').textContent = '🎲';
+      document.getElementById('warResultBox').textContent = '운명의 주사위가 구르고 있습니다...';
+
+      setTimeout(() => {
+        playSound('dice');
+        const outcome = resolveWarBetween(attacker, defender, true);
+        const diceFaces = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+        document.getElementById('warAttackerDice').textContent = diceFaces[outcome.atkRoll - 1];
+        document.getElementById('warDefenderDice').textContent = diceFaces[outcome.defRoll - 1];
+        document.getElementById('warAttackerPower').textContent = `주사위 ${outcome.atkRoll} (총 전투력 ${outcome.atkScore})`;
+        document.getElementById('warDefenderPower').textContent = `주사위 ${outcome.defRoll} (총 방어력 ${outcome.defScore})`;
+        document.getElementById('warResultBox').innerHTML = outcome.summaryHtml;
+        renderAll();
+      }, 650);
+    }
+
+    function closeWarDiceModal() {
+      playSound('click');
+      const modal = document.getElementById('warDiceModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function pickWarDefender(attacker) {
+      const others = state.nations.filter((n) => n.id !== attacker.id && !n.isEliminated);
+      if (others.length === 0) return null;
+      if (attacker.warTargetId && attacker.warTargetId > 0) {
+        const found = others.find((n) => n.id === Number(attacker.warTargetId));
+        if (found) return found;
+      }
+      // 기본값: 현재 발전도 상위 국가 또는 랜덤
+      const sorted = [...others].sort((a, b) => b.dev - a.dev);
+      return Math.random() < 0.65 ? sorted[0] : others[Math.floor(Math.random() * others.length)];
+    }
+
+    function resolveWarBetween(attacker, defender, isImmediate = false) {
+      state.totalWars += 1;
+      // 전쟁이 일어날 때마다 지구 공동 오염도 상승 & 양국 숲 불탐!
+      const pollIncrease = Math.max(3, Math.round(28 / Math.sqrt(state.nations.length)));
+      state.pollution = Math.min(100, state.pollution + pollIncrease);
+
+      attacker.trees = Math.max(0, attacker.trees - 10);
+      defender.trees = Math.max(0, defender.trees - 12);
+      attacker.terrainType = 'burned';
+      defender.terrainType = 'burned';
+
+      const atkRoll = Math.floor(Math.random() * 6) + 1;
+      const defRoll = Math.floor(Math.random() * 6) + 1;
+      // 공격국은 발전도 보너스, 방어국은 숲(지형) 보너스
+      const atkScore = atkRoll * 10 + Math.round(attacker.dev * 0.08);
+      const defScore = defRoll * 10 + Math.round(defender.trees * 0.12);
+
+      let summaryHtml = '';
+      if (atkScore >= defScore) {
+        const stolenDev = Math.min(defender.dev, 35);
+        const stolenTrees = Math.min(defender.trees, 15);
+        defender.dev -= stolenDev;
+        attacker.dev += stolenDev;
+        defender.trees -= stolenTrees;
+        attacker.trees = Math.min(150, attacker.trees + stolenTrees);
+
+        spawnNationFloatingText(attacker.id, `⚔️승리! +${stolenDev}💰`, 'text-amber-300');
+        spawnNationFloatingText(defender.id, `💥패배 -${stolenDev}💰`, 'text-rose-400');
+
+        summaryHtml = `<span class="text-amber-300">⚔️ [${attacker.name}] 공격 승리!</span> [${defender.name}]으로부터 발전도 <strong>${stolenDev}점</strong>과 나무 <strong>${stolenTrees}그루</strong>를 약탈했습니다! (단, 전쟁 포화로 양국 숲이 불타고 지구 오염도가 +${pollIncrease}% 상승했습니다!)`;
+      } else {
+        const lostDev = Math.min(attacker.dev, 20);
+        attacker.dev -= lostDev;
+        defender.dev += 10;
+
+        spawnNationFloatingText(attacker.id, `🛡️격퇴당함 -${lostDev}💰`, 'text-rose-400');
+        spawnNationFloatingText(defender.id, `🛡️방어성공 +10💰`, 'text-sky-300');
+
+        summaryHtml = `<span class="text-sky-300">🛡️ [${defender.name}] 방어 승리!</span> 무리하게 침략한 [${attacker.name}]은 발전도 <strong>-${lostDev}점</strong>의 피해를 입었습니다! (전쟁 포화로 지구 오염도 +${pollIncrease}% 상승!)`;
+      }
+
+      checkNationElimination(attacker);
+      checkNationElimination(defender);
+
+      addBroadcastLog(`⚔️ <strong>[전쟁 중계]</strong> ${summaryHtml}`);
+      return { atkRoll, defRoll, atkScore, defScore, summaryHtml };
+    }
+
+    function checkNationElimination(nation) {
+      if (nation.trees <= 0 && !nation.isEliminated) {
+        nation.trees = 0;
+        nation.isEliminated = true;
+        nation.terrainType = 'dead';
+        spawnNationFloatingText(nation.id, '🗿 이스터섬 멸망!', 'text-red-500');
+        addBroadcastLog(`🗿 <strong>[국가 멸망 속보]</strong> <span class="text-rose-400">${nation.name}</span>의 마지막 나무가 사라져 두 번째 이스터섬이 되었습니다!`);
+      }
+    }
+
+    /*************************************************************************
+     * 7. 라운드 동시 실행 및 실시간 자동 시간 흐름 루프
+     *************************************************************************/
+    function setAutoFlowSpeed(speed) {
+      playSound('click');
+      state.autoSpeed = speed;
+      updateAutoSpeedUI();
+    }
+
+    function updateAutoSpeedUI() {
+      const b0 = document.getElementById('btnPause');
+      const b1 = document.getElementById('btnSpeed1');
+      const b2 = document.getElementById('btnSpeed2');
+      [b0, b1, b2].forEach((b) => {
+        b.className = 'px-1.5 py-0.5 rounded text-[11px] font-bold text-slate-300 hover:bg-slate-700 transition';
+      });
+      if (state.autoSpeed === 0) {
+        b0.className = 'px-1.5 py-0.5 rounded text-[11px] font-extrabold bg-amber-500 text-slate-950';
+      } else if (state.autoSpeed === 1) {
+        b1.className = 'px-1.5 py-0.5 rounded text-[11px] font-extrabold bg-emerald-500 text-slate-950';
+      } else if (state.autoSpeed === 2) {
+        b2.className = 'px-1.5 py-0.5 rounded text-[11px] font-extrabold bg-sky-500 text-slate-950';
+      }
+    }
+
+    // 실시간 자동 시간 흐름 타이머 (1x 또는 2x 켜두었을 때 작동)
+    setInterval(() => {
+      if (state.autoSpeed === 0 || state.isExecuting || state.isGameOver) return;
+      const stepInc = state.autoSpeed === 2 ? 7 : 3.5;
+      state.flowProgress = Math.min(100, state.flowProgress + stepInc);
+      document.getElementById('timeProgressBar').style.width = `${state.flowProgress}%`;
+
+      if (state.flowProgress >= 100) {
+        state.flowProgress = 0;
+        executeCurrentRound();
+      }
+    }, 150);
+
+    function executeCurrentRound() {
+      if (state.isExecuting || state.isGameOver) return;
+      state.isExecuting = true;
+
+      const aliveNations = getAliveNations();
+      if (aliveNations.length === 0) {
+        triggerClassEnding('BAD_EASTER');
+        return;
+      }
+
+      // 참여 인원수에 비례해 지구 공동 오염도 증감 폭 스케일링 (25명일 때와 4명일 때 모두 밸런스 유지!)
+      const pollScale = 4 / Math.max(2, aliveNations.length);
+      let netPollDelta = 0;
+      let warCountThisRound = 0;
+
+      // 1) 각 국가의 고유 특성 및 맞춤 선택 행동 처리
+      aliveNations.forEach((n) => {
+        const debtPen = n.activeDebtStacks * 12;
+        const ch = (n.choices && n.choices[n.plannedAction]) || { trees: -12, dev: 25, poll: 4 };
+
+        if (n.plannedAction === 1) {
+          // 🏭 국가별 대규모 개발 (랜덤 대박 30% 확률로 +15점 추가 보너스!)
+          const isJackpot = Math.random() < 0.30;
+          const gain = ch.dev + (isJackpot ? 15 : 0) - debtPen;
+          n.trees = Math.max(0, n.trees + ch.trees);
+          n.dev = Math.max(0, n.dev + gain);
+          n.terrainType = 'factory';
+          netPollDelta += ch.poll * pollScale;
+          spawnNationFloatingText(n.id, `${isJackpot ? '🎲대박!' : ''}+${gain}💰 ${ch.trees}🌲`, 'text-rose-300');
+        } else if (n.plannedAction === 2) {
+          // 🏡 국가별 적정 개발·생태마을
+          const gain = ch.dev - debtPen;
+          n.trees = Math.max(0, n.trees + ch.trees);
+          n.dev = Math.max(0, n.dev + gain);
+          n.terrainType = 'village';
+          netPollDelta += ch.poll * pollScale;
+          spawnNationFloatingText(n.id, `+${gain}💰 ${ch.trees}🌲`, 'text-emerald-300');
+        } else if (n.plannedAction === 3) {
+          // ☀️ 국가별 친환경 재생에너지 & 숲 복원
+          const gain = ch.dev - debtPen;
+          n.trees = Math.min(150, n.trees + ch.trees);
+          n.dev = Math.max(0, n.dev + gain);
+          n.terrainType = 'eco';
+          netPollDelta += ch.poll * pollScale;
+          spawnNationFloatingText(n.id, `+${ch.trees}🌲 +${gain}💰`, 'text-cyan-300');
+        } else if (n.plannedAction === 4) {
+          // ⚡ 국가별 미래 자원 당겨쓰기 (유혹의 카드)
+          const gain = ch.dev - debtPen;
+          n.trees = Math.max(0, n.trees + ch.trees);
+          n.dev = Math.max(0, n.dev + gain);
+          n.nextGenDebtStacks += 1;
+          n.terrainType = 'factory';
+          netPollDelta += ch.poll * pollScale;
+          spawnNationFloatingText(n.id, `+${gain}💰 💣부채!`, 'text-purple-300');
+        } else if (n.plannedAction === 5) {
+          // ⚔️ 이웃 국가 침략 전쟁!
+          const defender = pickWarDefender(n);
+          if (defender) {
+            warCountThisRound++;
+            fireWarLaserBetween(n.id, defender.id);
+            resolveWarBetween(n, defender, false);
+          }
+        }
+
+        checkNationElimination(n);
+      });
+
+      state.pollution = Math.max(0, Math.min(100, Math.round(state.pollution + netPollDelta)));
+
+      if (warCountThisRound > 0) {
+        playSound('war');
+        triggerScreenShake('heavy');
+      } else {
+        playSound('eco');
+      }
+
+      // 2) 랜덤 글로벌 시대 이벤트 발동!
+      const randomEv = RANDOM_EVENTS_POOL[Math.floor(Math.random() * RANDOM_EVENTS_POOL.length)];
+      document.getElementById('randomEventBannerText').textContent = `${randomEv.title} — ${randomEv.desc}`;
+      randomEv.apply(state.nations);
+      addBroadcastLog(`🎲 <strong>[${state.year}년 랜덤 이벤트: ${randomEv.title}]</strong> ${randomEv.desc}`);
+
+      // 3) 오염도에 따른 자연재해 판정 (50% 이상: 40%, 70% 이상: 80%)
+      let disProb = 0;
+      if (state.pollution >= 70) disProb = 0.80;
+      else if (state.pollution >= 50) disProb = 0.40;
+
+      if (disProb > 0 && Math.random() < disProb) {
+        const isFire = Math.random() < 0.55;
+        const disName = isFire ? '🔥 대형 산불' : '⛰️ 대규모 산사태';
+        playSound('disaster');
+        triggerScreenShake('disaster');
+
+        // 생존 국가 중 약 35%의 영토에 재해 타격 (-15그루)
+        const victims = getAliveNations().filter(() => Math.random() < 0.4);
+        if (victims.length === 0 && getAliveNations().length > 0) {
+          victims.push(getAliveNations()[0]);
+        }
+        victims.forEach((v) => {
+          v.trees = Math.max(0, v.trees - 15);
+          v.terrainType = 'burned';
+          spawnNationFloatingText(v.id, `${disName} -15🌲`, 'text-red-400');
+          checkNationElimination(v);
+        });
+
+        showBroadcastBanner(
+          isFire ? '🔥' : '⛰️',
+          `지구 오염도(${state.pollution}%)로 인한 ${disName} 발생!`,
+          `${victims.map((v) => v.name).join(', ')} 영토에 재해가 덮쳐 나무 15그루가 소실되었습니다!`
+        );
+        addBroadcastLog(`🚨 <strong>[${disName} 강타!]</strong> 오염도(${state.pollution}%) 때문에 ${victims.length}개 국가의 숲이 불탔습니다(-15🌲)!`);
+      }
+
+      // 4) 살아남은 각 국가의 숲 자연 재생 (30그루 이상: +20%, 30그루 미만: +5%)
+      getAliveNations().forEach((n) => {
+        const rate = n.trees < 30 ? 0.05 : 0.20;
+        const regen = Math.round(n.trees * rate);
+        n.trees = Math.min(150, n.trees + regen);
+        // 전쟁을 한 뒤 다음 라운드 기본 행동은 적정 개발로 복귀 (학생 화면에도 즉시 동기화됨)
+        if (n.plannedAction === 5) n.plannedAction = 2;
+      });
+
+      renderAll();
+
+      // 5) 지구 공멸(오염도 100% 또는 생존 국가 0곳) 체크
+      if (state.pollution >= 100 || getAliveNations().length === 0) {
+        setTimeout(() => triggerClassEnding('BAD_EASTER'), 900);
+        return;
+      }
+
+      // 6) 세대교체(5라운드, 10라운드) 또는 최종 15라운드 종료 판정
+      setTimeout(() => {
+        if (state.round === 5 || state.round === 10) {
+          state.autoSpeed = 0;
+          updateAutoSpeedUI();
+          openGenerationTransitionModal();
+        } else if (state.round === TOTAL_ROUNDS) {
+          state.autoSpeed = 0;
+          updateAutoSpeedUI();
+          evaluateFinalClassEnding();
+        } else {
+          state.round += 1;
+          state.year = ROUND_YEARS[state.round - 1];
+          state.isExecuting = false;
+          renderAll();
+        }
+      }, 650);
+    }
+
+    /*************************************************************************
+     * 8. 시각 효과: 플로팅 텍스트, 전쟁 포격 레이저, 속보 배너, 로그
+     *************************************************************************/
+    function spawnNationFloatingText(nationId, text, colorClass) {
+      const tile = document.getElementById(`nation-tile-${nationId}`);
+      if (!tile) return;
+      const el = document.createElement('div');
+      el.className = `floating-juice text-xs sm:text-sm ${colorClass}`;
+      el.textContent = text;
+      tile.appendChild(el);
+      setTimeout(() => {
+        if (el && el.parentNode) el.parentNode.removeChild(el);
+      }, 1550);
+    }
+
+    function triggerScreenShake(mode = 'heavy') {
+      const root = document.getElementById('gameRoot');
+      const cls = mode === 'disaster' ? 'shake-disaster' : 'shake-heavy';
+      root.classList.remove('shake-heavy', 'shake-disaster');
+      void root.offsetWidth;
+      root.classList.add(cls);
+      setTimeout(() => root.classList.remove(cls), 850);
+    }
+
+    function showBroadcastBanner(icon, title, desc) {
+      const banner = document.getElementById('broadcastBanner');
+      document.getElementById('broadcastBannerIcon').textContent = icon;
+      document.getElementById('broadcastBannerTitle').textContent = title;
+      document.getElementById('broadcastBannerDesc').textContent = desc;
+      banner.classList.remove('hidden');
+      setTimeout(() => banner.classList.add('hidden'), 3000);
+    }
+
+    function addBroadcastLog(htmlText) {
+      const box = document.getElementById('historyLogContainer');
+      const item = document.createElement('div');
+      item.className = 'p-2 rounded-xl bg-slate-900/90 border border-slate-700/80 text-xs text-slate-200 leading-relaxed';
+      item.innerHTML = `<span class="text-[10px] font-bold text-amber-400">[${state.year}년 · ${state.round}R]</span> ${htmlText}`;
+      box.prepend(item);
+      document.getElementById('logCountNum').textContent = box.children.length;
+    }
+
+    // 전쟁 포격 궤적 이펙트 (공격국 타일 -> 방어국 타일)
+    const warCanvas = document.getElementById('warEffectCanvas');
+    const warCtx = warCanvas.getContext('2d');
+
+    function fireWarLaserBetween(attackerId, defenderId) {
+      const board = document.getElementById('continentBoard');
+      const atkEl = document.getElementById(`nation-tile-${attackerId}`);
+      const defEl = document.getElementById(`nation-tile-${defenderId}`);
+      if (!board || !atkEl || !defEl) return;
+
+      warCanvas.width = board.clientWidth;
+      warCanvas.height = board.clientHeight;
+      const bRect = board.getBoundingClientRect();
+      const aRect = atkEl.getBoundingClientRect();
+      const dRect = defEl.getBoundingClientRect();
+
+      state.warLasers.push({
+        x1: aRect.left - bRect.left + aRect.width / 2,
+        y1: aRect.top - bRect.top + aRect.height / 2,
+        x2: dRect.left - bRect.left + dRect.width / 2,
+        y2: dRect.top - bRect.top + dRect.height / 2,
+        alpha: 1.0
+      });
+    }
+
+    /*************************************************************************
+     * 9. 세대교체 모달 & 4가지 멀티 엔딩 및 시상식
+     *************************************************************************/
+    function openGenerationTransitionModal() {
+      playSound('eco');
+      const prevGen = GENERATIONS[state.generation];
+      const nextGen = GENERATIONS[state.generation + 1];
+
+      document.getElementById('genModalEraBadge').textContent =
+        `⏳ ${state.year}년: ${prevGen.title} 종료 ➔ ${nextGen.title} 시작`;
+      document.getElementById('genModalPrevIcon').textContent = prevGen.icon;
+      document.getElementById('genModalPrevLabel').textContent = prevGen.title;
+      document.getElementById('genModalNextIcon').textContent = nextGen.icon;
+      document.getElementById('genModalNextLabel').textContent = nextGen.title;
+
+      const alive = getAliveNations();
+      const avgTrees = alive.length > 0 ? Math.round(alive.reduce((s, n) => s + n.trees, 0) / alive.length) : 0;
+      const avgDev = Math.round(state.nations.reduce((s, n) => s + n.dev, 0) / state.nations.length);
+
+      document.getElementById('genModalTrees').textContent = `평균 ${avgTrees}그루`;
+      document.getElementById('genModalPoll').textContent = `${state.pollution}%`;
+      document.getElementById('genModalDev').textContent = `평균 ${avgDev}점`;
+      document.getElementById('genModalWars').textContent = `${state.totalWars}회`;
+
+      const textEl = document.getElementById('genModalFeedbackText');
+      if (state.pollution >= 50 || avgTrees < 55 || state.totalWars >= 3) {
+        textEl.textContent = `"${prevGen.title}가 발전 경쟁과 전쟁(${state.totalWars}회)으로 자원을 무분별하게 써버려, ${nextGen.title}인 당신들은 오염된 지구(오염도 ${state.pollution}%, 평균 나무 ${avgTrees}그루)에서 시작합니다!"`;
+      } else {
+        textEl.textContent = `"${prevGen.title}의 현명한 절제와 평화로운 협력 덕분에 푸른 숲(평균 ${avgTrees}그루, 오염도 ${state.pollution}%)을 물려받았습니다!"`;
+      }
+
+      const modal = document.getElementById('generationModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function confirmNextGeneration() {
+      playSound('click');
+      const modal = document.getElementById('generationModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+
+      state.generation += 1;
+      state.round += 1;
+      state.year = ROUND_YEARS[state.round - 1];
+
+      // 각 국가의 환경 부채를 다음 세대로 이관
+      state.nations.forEach((n) => {
+        n.activeDebtStacks = n.nextGenDebtStacks;
+        n.nextGenDebtStacks = 0;
+      });
+
+      state.isExecuting = false;
+      renderAll();
+    }
+
+    const ENDINGS_DATA = {
+      BAD_EASTER: {
+        badge: '배드 엔딩 1 (Bad Ending 1)',
+        badgeCls: 'bg-rose-500/25 text-rose-300 border border-rose-400/50',
+        icon: '🗿',
+        iconBoxCls: 'bg-rose-500/20 border-2 border-rose-400',
+        title: '두 번째 이스터섬 (승자 없는 공멸)',
+        story: `각자 1등을 차지하기 위해 무분별한 벌목과 침략 전쟁을 멈추지 않은 결과, 지구의 생태계가 완전히 무너졌습니다. 아무리 발전도 점수가 높았던 1등 국가라도 숨 쉴 공기와 마실 물이 사라진 지구에서는 살아남을 수 없었습니다. '나만 잘살면 된다'는 이기심이 결국 과거 이스터섬과 같은 공멸을 불렀습니다.`
+      },
+      BAD_COLLAPSE: {
+        badge: '배드 엔딩 2 (Bad Ending 2)',
+        badgeCls: 'bg-amber-500/25 text-amber-300 border border-amber-400/50',
+        icon: '🏚️',
+        iconBoxCls: 'bg-amber-500/20 border-2 border-amber-400',
+        title: '무너진 삶 (발전 목표 미달)',
+        story: `자연과 숲은 남았지만, 세대마다 필요한 최소한의 발전 목표(평균 300점)에 크게 못 미쳐 인류의 생활 기반이 무너졌습니다. 진정한 '지속가능한 삶'은 환경을 보호하는 것과 더불어 인간 사회의 조화로운 발전도 함께 이루어야 한다는 교훈을 남겼습니다.`
+      },
+      NORMAL_SURVIVOR: {
+        badge: '노멀 엔딩 (Normal Ending)',
+        badgeCls: 'bg-slate-500/30 text-slate-200 border border-slate-400/50',
+        icon: '😷',
+        iconBoxCls: 'bg-slate-600/30 border-2 border-slate-400',
+        title: '잿빛 미래의 생존자',
+        story: `2070년까지 인류가 멸망하지 않고 살아남았지만, 치열한 경쟁과 전쟁의 상처로 지구는 푸른 빛을 잃었습니다. 후손들은 방진 마스크를 쓴 채 오염된 강물과 대기를 복구하느라 막대한 비용을 치르며 살아갑니다.`
+      },
+      TRUE_MIRACLE: {
+        badge: '진 엔딩 (True Ending)',
+        badgeCls: 'bg-emerald-500/25 text-emerald-300 border border-emerald-400/50',
+        icon: '🌟',
+        iconBoxCls: 'bg-emerald-500/20 border-2 border-emerald-400',
+        title: '100년의 푸른 기적 (공존의 승리!)',
+        story: `축하합니다! 우리 반 모든 국가가 지나친 전쟁과 욕심을 절제하고, 숲이 재생할 수 있는 속도를 지키며 적정 개발과 친환경 투자를 이어갔습니다! 그 결과 학급 평균 발전도 300점 이상을 달성하면서도 푸른 숲(80그루 이상)과 맑은 지구(오염도 30% 이하)를 고스란히 지키는 기적을 완성했습니다!`
+      }
+    };
+
+    let currentEndingKey = 'TRUE_MIRACLE';
+
+    function evaluateFinalClassEnding() {
+      const alive = getAliveNations();
+      const avgTrees = alive.length > 0 ? Math.round(alive.reduce((s, n) => s + n.trees, 0) / alive.length) : 0;
+      const avgDev = Math.round(state.nations.reduce((s, n) => s + n.dev, 0) / state.nations.length);
+
+      if (alive.length === 0 || avgTrees <= 0 || state.pollution >= 100) {
+        triggerClassEnding('BAD_EASTER');
+      } else if (avgDev >= 300 && avgTrees >= 80 && state.pollution <= 30) {
+        triggerClassEnding('TRUE_MIRACLE');
+      } else if (avgDev < 240) {
+        triggerClassEnding('BAD_COLLAPSE');
+      } else {
+        triggerClassEnding('NORMAL_SURVIVOR');
+      }
+    }
+
+    function triggerClassEnding(endingKey) {
+      state.isGameOver = true;
+      state.isExecuting = false;
+      currentEndingKey = endingKey;
+
+      const info = ENDINGS_DATA[endingKey];
+      document.getElementById('endingIconBox').textContent = info.icon;
+      document.getElementById('endingIconBox').className = `w-16 h-16 rounded-2xl flex items-center justify-center text-4xl shrink-0 ${info.iconBoxCls}`;
+      document.getElementById('endingTypeBadge').textContent = info.badge;
+      document.getElementById('endingTypeBadge').className = `text-xs font-extrabold px-3 py-0.5 rounded-full ${info.badgeCls}`;
+      document.getElementById('endingTitle').textContent = info.title;
+      document.getElementById('endingStoryBox').textContent = info.story;
+
+      const alive = getAliveNations();
+      const avgTrees = alive.length > 0 ? Math.round(alive.reduce((s, n) => s + n.trees, 0) / alive.length) : 0;
+      const avgDev = Math.round(state.nations.reduce((s, n) => s + n.dev, 0) / state.nations.length);
+
+      document.getElementById('endingFinalTrees').textContent = `평균 ${avgTrees}그루`;
+      document.getElementById('endingFinalDev').textContent = `평균 ${avgDev}점`;
+      document.getElementById('endingFinalPoll').textContent = `${state.pollution}%`;
+
+      // 학급 시상식 계산
+      const byDev = getSortedRanks();
+      const byTrees = [...state.nations].sort((a, b) => b.trees - a.trees);
+      const byBalance = [...state.nations].sort((a, b) => (b.dev + b.trees * 2) - (a.dev + a.trees * 2));
+
+      document.getElementById('awardTopDev').textContent = byDev[0] ? `${byDev[0].name} (💰${byDev[0].dev}점)` : '-';
+      document.getElementById('awardTopEco').textContent = byTrees[0] ? `${byTrees[0].name} (🌲${byTrees[0].trees}그루)` : '-';
+      document.getElementById('awardBalanced').textContent = byBalance[0] ? `${byBalance[0].name} (🌲${byBalance[0].trees}·💰${byBalance[0].dev})` : '-';
+
+      const modal = document.getElementById('endingModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function openReportView() {
+      playSound('click');
+      const info = ENDINGS_DATA[currentEndingKey];
+      const grade = document.getElementById('studentGrade').value.trim() || '6학년';
+      const cls = document.getElementById('studentClass').value.trim() || '__반';
+      const num = document.getElementById('studentNumber').value.trim() || '';
+      const name = document.getElementById('studentName').value.trim() || '우리 반';
+      const reflection = document.getElementById('reflectionText').value.trim() ||
+        '미래 세대를 위해 지나친 욕심과 분쟁을 멈추고 지속가능한 삶을 실천하겠습니다!';
+
+      document.getElementById('reportStudentInfo').textContent = `${grade} ${cls} ${num} ${name}`;
+      const now = new Date();
+      document.getElementById('reportDateInfo').textContent = `작성일: ${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일`;
+
+      document.getElementById('reportEndingIcon').textContent = info.icon;
+      document.getElementById('reportEndingType').textContent = info.badge;
+      document.getElementById('reportEndingTitle').textContent = info.title;
+
+      const alive = getAliveNations();
+      const avgTrees = alive.length > 0 ? Math.round(alive.reduce((s, n) => s + n.trees, 0) / alive.length) : 0;
+      const avgDev = Math.round(state.nations.reduce((s, n) => s + n.dev, 0) / state.nations.length);
+
+      document.getElementById('reportTrees').textContent = `평균 ${avgTrees}그루`;
+      document.getElementById('reportDev').textContent = `평균 ${avgDev}점`;
+      document.getElementById('reportPoll').textContent = `${state.pollution}%`;
+
+      const tbody = document.getElementById('reportRankTableBody');
+      tbody.innerHTML = '';
+      getSortedRanks().slice(0, 10).forEach((n, idx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="py-1.5 px-2.5 font-black text-slate-800">${idx + 1}위</td>
+          <td class="py-1.5 px-2.5 font-bold text-slate-800">${n.name}</td>
+          <td class="py-1.5 px-2.5 font-bold text-sky-700">${n.dev}점</td>
+          <td class="py-1.5 px-2.5 font-bold text-emerald-700">${n.trees}그루</td>
+          <td class="py-1.5 px-2.5 font-semibold text-slate-600">${n.isEliminated ? '멸망(탈락)' : '생존'}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById('reportReflectionContent').textContent = reflection;
+      const m = document.getElementById('reportModal');
+      m.classList.remove('hidden');
+      m.classList.add('flex');
+    }
+
+    function closeReportView() {
+      const m = document.getElementById('reportModal');
+      m.classList.add('hidden');
+      m.classList.remove('flex');
+    }
+
+    function downloadReportImage() {
+      playSound('eco');
+      const canvas = document.createElement('canvas');
+      canvas.width = 1000;
+      canvas.height = 700;
+      const ctx = canvas.getContext('2d');
+
+      const info = ENDINGS_DATA[currentEndingKey];
+      const name = document.getElementById('studentName').value.trim() || '미래지킴이';
+      const reflection = document.getElementById('reflectionText').value.trim() ||
+        '미래 세대를 위해 평화롭게 협력하고 환경을 보호하겠습니다!';
+
+      const grad = ctx.createLinearGradient(0, 0, 1000, 700);
+      grad.addColorStop(0, '#0f172a');
+      grad.addColorStop(1, '#064e3b');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 1000, 700);
+
+      ctx.strokeStyle = '#34d399';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(24, 24, 952, 652);
+
+      ctx.fillStyle = '#6ee7b7';
+      ctx.font = 'bold 18px Pretendard, sans-serif';
+      ctx.fillText('초등학교 6학년 도덕 · 07. 우리 모두의 미래를 위한 선택  |  출처: 하모쌤', 56, 72);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 34px Pretendard, sans-serif';
+      ctx.fillText(`🌍 100년의 유산 학급 대항전 결과 카드 (${name})`, 56, 120);
+
+      ctx.fillStyle = '#fde68a';
+      ctx.font = 'bold 26px Pretendard, sans-serif';
+      ctx.fillText(`${info.icon} 달성 엔딩: ${info.title} (지구 오염도 ${state.pollution}%)`, 56, 175);
+
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = '22px Pretendard, sans-serif';
+      ctx.fillText('✍️ 나의 깨달음과 미래 세대 지킴이 다짐:', 56, 240);
+      ctx.fillText(reflection.substring(0, 90), 56, 290);
+      if (reflection.length > 90) ctx.fillText(reflection.substring(90, 180), 56, 330);
+
+      ctx.fillStyle = '#a7f3d0';
+      ctx.font = 'bold 18px Pretendard, sans-serif';
+      ctx.fillText('✨ 출처: 하모쌤', 810, 645);
+
+      const link = document.createElement('a');
+      link.download = `100년의유산_결과카드_${name}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    /*************************************************************************
+     * 10. 상단 파노라마 디오라마 Canvas & 전쟁 레이저 애니메이션 루프
+     *************************************************************************/
+    const pCanvas = document.getElementById('panoramaCanvas');
+    const pCtx = pCanvas.getContext('2d');
+    let animTick = 0;
+
+    function resizeCanvases() {
+      const vp = document.getElementById('panoramaHeaderViewport');
+      if (vp) {
+        pCanvas.width = vp.clientWidth;
+        pCanvas.height = vp.clientHeight;
+      }
+      const board = document.getElementById('continentBoard');
+      if (board) {
+        warCanvas.width = board.clientWidth;
+        warCanvas.height = board.clientHeight;
+      }
+    }
+    window.addEventListener('resize', resizeCanvases);
+
+    function animateVisuals() {
+      if (!pCanvas.width) resizeCanvases();
+      const w = pCanvas.width;
+      const h = pCanvas.height;
+      const p = state.pollution;
+      animTick += 0.04;
+
+      // 상단 파노라마 하늘 및 산맥 배경
+      const skyGrad = pCtx.createLinearGradient(0, 0, 0, h);
+      if (p <= 30) {
+        skyGrad.addColorStop(0, '#0369a1');
+        skyGrad.addColorStop(1, '#047857');
+      } else if (p < 70) {
+        skyGrad.addColorStop(0, '#475569');
+        skyGrad.addColorStop(1, '#3f6212');
+      } else {
+        skyGrad.addColorStop(0, '#450a0a');
+        skyGrad.addColorStop(1, '#292524');
+      }
+      pCtx.fillStyle = skyGrad;
+      pCtx.fillRect(0, 0, w, h);
+
+      // 능선
+      pCtx.beginPath();
+      pCtx.moveTo(0, h);
+      pCtx.lineTo(0, h * 0.62);
+      pCtx.quadraticCurveTo(w * 0.25, h * 0.35, w * 0.5, h * 0.65);
+      pCtx.quadraticCurveTo(w * 0.78, h * 0.38, w, h * 0.60);
+      pCtx.lineTo(w, h);
+      pCtx.closePath();
+      pCtx.fillStyle = p >= 60 ? 'rgba(41, 37, 36, 0.75)' : 'rgba(6, 78, 59, 0.75)';
+      pCtx.fill();
+
+      // 하늘 파티클 (나비 / 연기 / 불티)
+      for (let i = 0; i < 10; i++) {
+        const px = ((i * 130 + animTick * 22) % (w + 40)) - 20;
+        const py = 25 + Math.sin(animTick + i) * 14 + (i % 3) * 24;
+        pCtx.font = '14px sans-serif';
+        if (p <= 30) pCtx.fillText(i % 2 === 0 ? '🦋' : '🕊️', px, py);
+        else if (p < 70) pCtx.fillText('💨', px, py);
+        else pCtx.fillText('🔥', px, py);
+      }
+
+      // 전쟁 포격 레이저 궤적 렌더링
+      if (warCanvas.width) {
+        warCtx.clearRect(0, 0, warCanvas.width, warCanvas.height);
+        for (let i = state.warLasers.length - 1; i >= 0; i--) {
+          const lz = state.warLasers[i];
+          lz.alpha -= 0.025;
+          if (lz.alpha <= 0) {
+            state.warLasers.splice(i, 1);
+            continue;
+          }
+          warCtx.save();
+          warCtx.strokeStyle = `rgba(239, 68, 68, ${lz.alpha})`;
+          warCtx.lineWidth = 5;
+          warCtx.beginPath();
+          warCtx.moveTo(lz.x1, lz.y1);
+          warCtx.quadraticCurveTo((lz.x1 + lz.x2) / 2, Math.min(lz.y1, lz.y2) - 45, lz.x2, lz.y2);
+          warCtx.stroke();
+
+          warCtx.font = '22px sans-serif';
+          warCtx.fillText('💥', lz.x2 - 11, lz.y2 + 8);
+          warCtx.restore();
+        }
+      }
+
+      requestAnimationFrame(animateVisuals);
+    }
+
+    /*************************************************************************
+     * 11. 실시간 교실 방 코드 하이브리드 연동 (표준 443 포트 WSS/HTTPS 클라우드 중계 + PeerJS 이중 백업)
+     * - 학교 태블릿(크롬북/아이패드/갤럭시탭) 와이파이 방화벽에서 UDP나 비표준 포트가 막혀 있어도
+     *   일반 웹사이트와 동일한 표준 443 포트(HTTPS EventSource/POST + WSS 443)로 100% 연결됩니다.
+     *************************************************************************/
+    const PEER_ICE_CONFIG = {
+      debug: 0,
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun.cloudflare.com:3478' }
+        ]
+      }
+    };
+
+    // 표준 443 포트를 최우선으로 배치하여 학교 방화벽 포트 차단 완벽 우회
+    const MQTT_BROKERS = [
+      'wss://test.mosquitto.org:8081/mqtt',
+      'wss://broker.emqx.io:8084/mqtt',
+      'wss://broker.hivemq.com:8884/mqtt',
+      'wss://mqtt.eclipseprojects.io:443/mqtt'
+    ];
+
+    const NTFY_BASE_URL = 'https://ntfy.sh';
+
+    let hostPeer = null;
+    let hostMqttClients = [];
+    let hostEventSource = null;
+    let currentHostCode = '';
+    let studentConnections = {};
+    let mqttConnectedStudents = {};
+    let clientPeer = null;
+    let clientConn = null;
+    let clientMqttList = [];
+    let clientEventSource = null;
+    let myStudentId = 1;
+    let myRoomCode = '';
+    let myPlannedAction = 2;
+    let pendingStudentAction = null;
+    let isStudentClientMode = false;
+    let broadcastChannel = null;
+
+    function getRoomTopicBase(code) {
+      return `hamossam/eco-civ-2026/room-${code}`;
+    }
+
+    function getNtfyTopics(code) {
+      return {
+        toHost: `hamossam_ecociv_2026_${code}_tohost`,
+        fromHost: `hamossam_ecociv_2026_${code}_fromhost`
+      };
+    }
+
+    function postNtfyMessage(topic, payloadObj) {
+      try {
+        fetch(`${NTFY_BASE_URL}/${topic}`, {
+          method: 'POST',
+          body: JSON.stringify(payloadObj),
+          headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+          mode: 'cors',
+          cache: 'no-store'
+        }).catch(() => {});
+      } catch (e) {}
+    }
+
+    function openRoomModal() {
+      playSound('click');
+      const m = document.getElementById('roomModal');
+      m.classList.remove('hidden');
+      m.classList.add('flex');
+      const msgEl = document.getElementById('joinRoomStatusMsg');
+      if (msgEl) msgEl.classList.add('hidden');
+      if (!isStudentClientMode && !currentHostCode) {
+        initTeacherPeerHost();
+      }
+    }
+
+    function closeRoomModal() {
+      const m = document.getElementById('roomModal');
+      m.classList.add('hidden');
+      m.classList.remove('flex');
+    }
+
+    function reopenStudentJoinModal() {
+      playSound('click');
+      const codeInput = document.getElementById('joinRoomCodeInput');
+      const numInput = document.getElementById('joinStudentNumInput');
+      if (codeInput && myRoomCode) codeInput.value = myRoomCode;
+      if (numInput && myStudentId) numInput.value = myStudentId;
+      openRoomModal();
+    }
+
+    function setJoinModalStatus(text, type = 'info') {
+      const el = document.getElementById('joinRoomStatusMsg');
+      if (!el) return;
+      el.classList.remove('hidden', 'bg-sky-950/90', 'text-sky-300', 'border-sky-500/40', 'bg-rose-950/90', 'text-rose-300', 'border-rose-500/40', 'bg-emerald-950/90', 'text-emerald-300', 'border-emerald-500/40');
+      el.classList.add('border');
+      if (type === 'error') {
+        el.classList.add('bg-rose-950/90', 'text-rose-300', 'border-rose-500/40');
+      } else if (type === 'success') {
+        el.classList.add('bg-emerald-950/90', 'text-emerald-300', 'border-emerald-500/40');
+      } else {
+        el.classList.add('bg-sky-950/90', 'text-sky-300', 'border-sky-500/40');
+      }
+      el.textContent = text;
+    }
+
+    function updateStudentConnectionBadge(isConnected, customText) {
+      const badge = document.getElementById('scConnectionBadge');
+      if (!badge) return;
+      if (isConnected) {
+        badge.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/40';
+        badge.textContent = customText || `🟢 중계방(${myRoomCode}) 연결됨`;
+      } else {
+        badge.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-400/40 animate-pulse';
+        badge.textContent = customText || '🔴 연결 끊김 (자동 재연결 중...)';
+      }
+    }
+
+    function cleanupHostTransports() {
+      if (hostPeer) {
+        try { hostPeer.destroy(); } catch (e) {}
+        hostPeer = null;
+      }
+      if (hostMqttClients.length > 0) {
+        hostMqttClients.forEach((mc) => {
+          try { mc.end(true); } catch (e) {}
+        });
+        hostMqttClients = [];
+      }
+      if (hostEventSource) {
+        try { hostEventSource.close(); } catch (e) {}
+        hostEventSource = null;
+      }
+      if (broadcastChannel) {
+        try { broadcastChannel.close(); } catch (e) {}
+        broadcastChannel = null;
+      }
+    }
+
+    function cleanupClientTransports() {
+      if (clientPeer) {
+        try { clientPeer.destroy(); } catch (e) {}
+        clientPeer = null;
+      }
+      clientConn = null;
+      if (clientMqttList.length > 0) {
+        clientMqttList.forEach((mc) => {
+          try { mc.end(true); } catch (e) {}
+        });
+        clientMqttList = [];
+      }
+      if (clientEventSource) {
+        try { clientEventSource.close(); } catch (e) {}
+        clientEventSource = null;
+      }
+    }
+
+    let lastActionTimestampByStudent = {};
+
+    function handleIncomingStudentPayload(data, peerConn = null) {
+      if (!data || !data.type || isStudentClientMode) return;
+      const sid = Math.max(1, Math.min(state.nations.length, parseInt(data.studentId, 10) || 1));
+      const nation = state.nations.find((n) => n.id === sid);
+
+      if (peerConn) {
+        peerConn._studentId = sid;
+        studentConnections[sid] = peerConn;
+      } else {
+        mqttConnectedStudents[sid] = Date.now();
+      }
+      if (nation) nation.connectedPeer = true;
+
+      if (data.type === 'JOIN') {
+        updateConnectedCountUI();
+        broadcastStateToStudents(sid);
+      } else if (data.type === 'ACTION') {
+        // 다중 채널 중복 액션 수신 방지
+        const msgId = data.msgId || `${sid}-${data.actionId}-${data.warTargetId}`;
+        if (data.msgId && lastActionTimestampByStudent[sid] === msgId) {
+          return;
+        }
+        if (data.msgId) lastActionTimestampByStudent[sid] = msgId;
+
+        if (nation && !nation.isEliminated) {
+          const actId = parseInt(data.actionId, 10);
+          if (actId >= 1 && actId <= 5) {
+            nation.plannedAction = actId;
+          }
+          if (data.warTargetId !== undefined) {
+            nation.warTargetId = parseInt(data.warTargetId, 10);
+          }
+          spawnNationFloatingText(nation.id, '📱선택완료!', 'text-sky-300');
+        }
+        updateConnectedCountUI();
+        renderAll();
+      }
+    }
+
+    function buildStatePayloadForStudent(nation) {
+      return {
+        type: 'STATE',
+        studentId: nation.id,
+        nation,
+        round: state.round,
+        year: state.year,
+        generation: state.generation,
+        pollution: state.pollution,
+        nationsList: state.nations.map((n) => ({
+          id: n.id,
+          name: n.name,
+          dev: n.dev,
+          trees: n.trees,
+          isEliminated: n.isEliminated
+        }))
+      };
+    }
+
+    function initTeacherPeerHost(retryCount = 0) {
+      if (isStudentClientMode) return;
+      cleanupHostTransports();
+
+      studentConnections = {};
+      mqttConnectedStudents = {};
+      state.nations.forEach((n) => { n.connectedPeer = false; });
+      updateConnectedCountUI();
+
+      const code = String(Math.floor(1000 + Math.random() * 9000));
+      currentHostCode = code;
+      document.getElementById('hostRoomCodeDisplay').textContent = code;
+      document.getElementById('headerRoomCodeText').textContent = `방 코드: ${code}`;
+
+      // 1) 동일 기기 탭 간 즉시 통신용 BroadcastChannel
+      if (typeof BroadcastChannel !== 'undefined') {
+        try {
+          broadcastChannel = new BroadcastChannel(`eco-civ-bc-${code}`);
+          broadcastChannel.onmessage = (ev) => {
+            if (ev && ev.data) handleIncomingStudentPayload(ev.data, null);
+          };
+        } catch (e) {}
+      }
+
+      // 2) 표준 HTTPS(443 포트) 스트리밍 채널 (웹소켓·UDP가 모두 막힌 학교 태블릿 100% 통과용)
+      if (typeof EventSource !== 'undefined') {
+        try {
+          const ntfyTopics = getNtfyTopics(code);
+          hostEventSource = new EventSource(`${NTFY_BASE_URL}/${ntfyTopics.toHost}/sse`);
+          hostEventSource.onmessage = (ev) => {
+            try {
+              const outer = JSON.parse(ev.data);
+              if (outer && outer.message) {
+                const parsed = JSON.parse(outer.message);
+                handleIncomingStudentPayload(parsed, null);
+              }
+            } catch (e) {}
+          };
+        } catch (e) {}
+      }
+
+      // 3) 학교 와이파이/방화벽 우회용 MQTT over WebSocket (443 포함 다중 브로커)
+      if (typeof mqtt !== 'undefined') {
+        const topicBase = getRoomTopicBase(code);
+        MQTT_BROKERS.forEach((brokerUrl) => {
+          try {
+            const mc = mqtt.connect(brokerUrl, {
+              connectTimeout: 5000,
+              reconnectPeriod: 2500,
+              clean: true
+            });
+            mc.on('connect', () => {
+              mc.subscribe(`${topicBase}/toHost`, { qos: 0 });
+              broadcastStateToStudents();
+            });
+            mc.on('message', (topic, message) => {
+              try {
+                const parsed = JSON.parse(message.toString());
+                handleIncomingStudentPayload(parsed, null);
+              } catch (e) {}
+            });
+            hostMqttClients.push(mc);
+          } catch (e) {}
+        });
+      }
+
+      // 4) PeerJS WebRTC 채널
+      if (typeof Peer !== 'undefined') {
+        try {
+          hostPeer = new Peer(`eco-civ-room-${code}`, PEER_ICE_CONFIG);
+
+          hostPeer.on('open', () => {
+            document.getElementById('hostRoomCodeDisplay').textContent = code;
+            document.getElementById('headerRoomCodeText').textContent = `방 코드: ${code}`;
+          });
+
+          hostPeer.on('disconnected', () => {
+            if (hostPeer && !hostPeer.destroyed) {
+              try { hostPeer.reconnect(); } catch (e) {}
+            }
+          });
+
+          hostPeer.on('error', (err) => {
+            if (err && err.type === 'unavailable-id' && retryCount < 5) {
+              initTeacherPeerHost(retryCount + 1);
+            }
+          });
+
+          hostPeer.on('connection', (conn) => {
+            conn.on('open', () => {
+              if (conn._studentId) {
+                broadcastStateToStudents(conn._studentId);
+              }
+            });
+
+            conn.on('data', (data) => {
+              handleIncomingStudentPayload(data, conn);
+            });
+
+            const handleClose = () => {
+              if (conn._studentId && studentConnections[conn._studentId] === conn) {
+                delete studentConnections[conn._studentId];
+                if (!mqttConnectedStudents[conn._studentId]) {
+                  const nation = state.nations.find((n) => n.id === conn._studentId);
+                  if (nation) nation.connectedPeer = false;
+                }
+                updateConnectedCountUI();
+              }
+            };
+            conn.on('close', handleClose);
+            conn.on('error', handleClose);
+          });
+        } catch (err) {
+          console.warn('PeerJS init warning:', err);
+        }
+      }
+
+      // 방 생성 직후 초기 상태 1회 게시
+      setTimeout(() => broadcastStateToStudents(), 400);
+    }
+
+    function updateConnectedCountUI() {
+      const connectedSet = new Set();
+      Object.keys(studentConnections).forEach((sid) => {
+        const c = studentConnections[sid];
+        if (c && c.open) connectedSet.add(String(sid));
+      });
+      Object.keys(mqttConnectedStudents).forEach((sid) => {
+        connectedSet.add(String(sid));
+      });
+      const el = document.getElementById('hostConnectedCount');
+      if (el) {
+        el.textContent = `현재 기기로 접속한 학생: ${connectedSet.size}명 (나머지 국가는 전자칠판에서 직접/랜덤 조작 가능)`;
+      }
+    }
+
+    let ntfyBroadcastThrottleTimer = null;
+
+    function broadcastStateToStudents(onlyStudentId = null) {
+      if (isStudentClientMode || !currentHostCode) return;
+
+      // 1) PeerJS 연결 학생에게 전송
+      Object.entries(studentConnections).forEach(([sid, conn]) => {
+        if (onlyStudentId && Number(sid) !== Number(onlyStudentId)) return;
+        const nation = state.nations.find((n) => n.id === Number(sid));
+        if (conn && nation) {
+          nation.connectedPeer = true;
+          const payload = buildStatePayloadForStudent(nation);
+          if (conn.open) {
+            try { conn.send(payload); } catch (e) {}
+          } else {
+            conn.once('open', () => {
+              try { conn.send(payload); } catch (e) {}
+            });
+          }
+        }
+      });
+
+      // 2) MQTT, HTTPS(443), BroadcastChannel 학생에게 전송
+      const topicBase = getRoomTopicBase(currentHostCode);
+      const targetNations = onlyStudentId
+        ? state.nations.filter((n) => n.id === Number(onlyStudentId))
+        : state.nations;
+
+      // 전체 상태 패킷 1개로 묶어 브로드캐스트
+      const bulkPayload = {
+        type: 'BULK_STATE',
+        onlyStudentId: onlyStudentId || null,
+        round: state.round,
+        year: state.year,
+        generation: state.generation,
+        pollution: state.pollution,
+        nations: targetNations,
+        nationsList: state.nations.map((n) => ({
+          id: n.id,
+          name: n.name,
+          dev: n.dev,
+          trees: n.trees,
+          isEliminated: n.isEliminated
+        }))
+      };
+
+      const jsonStr = JSON.stringify(bulkPayload);
+      // retain: true 옵션으로 늦게 접속한 태블릿도 즉시 최신 상태를 받도록 설정
+      hostMqttClients.forEach((mc) => {
+        if (mc && mc.connected) {
+          try { mc.publish(`${topicBase}/fromHost`, jsonStr, { qos: 0, retain: !onlyStudentId }); } catch (e) {}
+        }
+      });
+
+      if (broadcastChannel) {
+        try { broadcastChannel.postMessage(bulkPayload); } catch (e) {}
+      }
+
+      // 표준 HTTPS(443) 채널로도 전송 (짧은 시간 다중 호출 시 쓰로틀링)
+      if (!ntfyBroadcastThrottleTimer) {
+        ntfyBroadcastThrottleTimer = setTimeout(() => {
+          ntfyBroadcastThrottleTimer = null;
+          if (!currentHostCode) return;
+          const ntfyTopics = getNtfyTopics(currentHostCode);
+          postNtfyMessage(ntfyTopics.fromHost, {
+            type: 'BULK_STATE',
+            round: state.round,
+            year: state.year,
+            generation: state.generation,
+            pollution: state.pollution,
+            nations: state.nations,
+            nationsList: state.nations.map((n) => ({
+              id: n.id,
+              name: n.name,
+              dev: n.dev,
+              trees: n.trees,
+              isEliminated: n.isEliminated
+            }))
+          });
+        }, 180);
+      }
+
+      updateConnectedCountUI();
+    }
+
+    function renderStudentClientState(data) {
+      if (!data || !data.nation) return;
+      const nation = data.nation;
+      myPlannedAction = nation.plannedAction || 2;
+
+      updateStudentConnectionBadge(true, `🟢 중계방(${myRoomCode}) 연결됨`);
+      document.getElementById('scNationName').textContent = `내 국가: ${nation.name}`;
+      const traitBadge = document.getElementById('scTraitBadge');
+      if (traitBadge) traitBadge.textContent = nation.trait || '특성 국가';
+
+      document.getElementById('scTrees').textContent = `${nation.trees}그루`;
+      document.getElementById('scDev').textContent = `${nation.dev}점`;
+      document.getElementById('scPoll').textContent = `${data.pollution}%`;
+
+      const roundInfo = document.getElementById('scRoundInfoText');
+      if (roundInfo && data.year && data.round) {
+        roundInfo.textContent = `📢 ${data.year}년 (${data.round}/${TOTAL_ROUNDS} 라운드) 나의 정책 예약`;
+      }
+
+      // 국가별 맞춤 1~4번 선택지 제목·수치 업데이트
+      const icons = { 1: '🏭', 2: '🏡', 3: '☀️', 4: '⚡' };
+      if (nation.choices) {
+        for (let c = 1; c <= 4; c++) {
+          const ch = nation.choices[c];
+          const tEl = document.getElementById(`scBtn${c}Title`);
+          const dEl = document.getElementById(`scBtn${c}Delta`);
+          if (tEl && ch) tEl.textContent = `${icons[c]} ${c}. ${ch.title}`;
+          if (dEl && ch) {
+            const trSign = ch.trees >= 0 ? `+${ch.trees}` : ch.trees;
+            const plSign = ch.poll >= 0 ? `+${ch.poll}%` : `${ch.poll}%`;
+            const extra = c === 4 ? ' | 다음 세대 매 턴 -12점 부채!' : '';
+            dEl.textContent = `🌲나무 ${trSign} | 💰발전도 +${ch.dev} | 🌡️오염 ${plSign}${extra}`;
+          }
+        }
+      }
+
+      // 전쟁 타깃 드롭다운 업데이트
+      const sel = document.getElementById('scWarTargetSelect');
+      if (sel && Array.isArray(data.nationsList)) {
+        const curVal = nation.warTargetId && nation.warTargetId !== -1 ? nation.warTargetId : sel.value;
+        sel.innerHTML = `<option value="-1">🎯 1등 국가 또는 랜덤 타깃 공격</option>`;
+        data.nationsList.forEach((other) => {
+          if (other.id !== nation.id && !other.isEliminated) {
+            const opt = document.createElement('option');
+            opt.value = other.id;
+            opt.textContent = `🎯 ${other.name} (💰${other.dev}점)`;
+            if (String(other.id) === String(curVal)) opt.selected = true;
+            sel.appendChild(opt);
+          }
+        });
+      }
+
+      // 현재 선택된 행동 버튼 하이라이트 & 하단 상태창 동기화
+      updateStudentActionHighlight(nation);
+    }
+
+    function updateStudentActionHighlight(nation) {
+      const planned = nation ? nation.plannedAction : myPlannedAction;
+      for (let i = 1; i <= 4; i++) {
+        const btn = document.getElementById(`scBtn${i}`);
+        const bdg = document.getElementById(`scBtn${i}Badge`);
+        if (!btn) continue;
+        if (planned === i) {
+          btn.classList.add('ring-2', 'ring-amber-300', 'scale-[1.01]');
+          if (bdg) bdg.textContent = '✅ 선택됨';
+        } else {
+          btn.classList.remove('ring-2', 'ring-amber-300', 'scale-[1.01]');
+          if (bdg) bdg.textContent = '선택';
+        }
+      }
+      const box5 = document.getElementById('scBtn5Box');
+      const btn5 = document.getElementById('scBtn5');
+      if (box5 && btn5) {
+        if (planned === 5) {
+          box5.classList.add('ring-2', 'ring-amber-300', 'bg-rose-950/40');
+          btn5.textContent = '✅ 전쟁 예약됨!';
+        } else {
+          box5.classList.remove('ring-2', 'ring-amber-300', 'bg-rose-950/40');
+          btn5.textContent = '⚔️ 침략 발동!';
+        }
+      }
+
+      const statusEl = document.getElementById('scSelectedStatus');
+      if (!statusEl) return;
+      if (nation && nation.isEliminated) {
+        statusEl.textContent = '💀 내 국가의 나무가 모두 사라져 멸망했습니다 (새 게임 시작 시 부활)';
+        statusEl.className = 'text-center text-xs font-extrabold text-rose-400 bg-slate-900 p-2.5 rounded-xl border border-rose-500/40';
+        return;
+      }
+      statusEl.className = 'text-center text-xs font-extrabold text-amber-300 bg-slate-900 p-2.5 rounded-xl border border-slate-700';
+      const act = ACTION_META[planned] || ACTION_META[2];
+      const customChoice = nation && nation.choices && nation.choices[planned];
+      const label = planned === 5
+        ? `${act.icon} 5. 이웃 국가 침략 전쟁 선포!`
+        : (customChoice ? `${act.icon} ${planned}. ${customChoice.title}` : act.name);
+      statusEl.textContent = `✅ 선생님 칠판에 반영된 내 선택: ${label}`;
+    }
+
+    function sendPayloadFromStudentToHost(payload) {
+      let sentAny = false;
+      // 1) PeerJS DataChannel 전송
+      if (clientConn && clientConn.open) {
+        try {
+          clientConn.send(payload);
+          sentAny = true;
+        } catch (e) {}
+      }
+      // 2) MQTT 브로커 전송
+      if (myRoomCode && clientMqttList.length > 0) {
+        const topicBase = getRoomTopicBase(myRoomCode);
+        const msg = JSON.stringify(payload);
+        clientMqttList.forEach((mc) => {
+          if (mc && mc.connected) {
+            try {
+              mc.publish(`${topicBase}/toHost`, msg, { qos: 0 });
+              sentAny = true;
+            } catch (e) {}
+          }
+        });
+      }
+      // 3) 표준 HTTPS(443 포트) POST 전송 (학교 태블릿 방화벽 100% 통과)
+      if (myRoomCode) {
+        const ntfyTopics = getNtfyTopics(myRoomCode);
+        postNtfyMessage(ntfyTopics.toHost, payload);
+        sentAny = true;
+      }
+      // 4) 동일 브라우저 BroadcastChannel 전송
+      if (broadcastChannel) {
+        try {
+          broadcastChannel.postMessage(payload);
+          sentAny = true;
+        } catch (e) {}
+      }
+      return sentAny;
+    }
+
+    function joinAsStudentClient() {
+      const code = document.getElementById('joinRoomCodeInput').value.trim();
+      const sNum = parseInt(document.getElementById('joinStudentNumInput').value, 10);
+      if (!code || code.length !== 4) {
+        setJoinModalStatus('⚠️ 선생님 화면의 4자리 방 코드를 정확히 입력해주세요!', 'error');
+        return;
+      }
+      if (!sNum || sNum < 1 || sNum > 30) {
+        setJoinModalStatus('⚠️ 내 번호(1~30번)를 정확히 입력해주세요!', 'error');
+        return;
+      }
+
+      playSound('click');
+      myStudentId = sNum;
+      myRoomCode = code;
+      isStudentClientMode = true;
+
+      // 학생 기기에서는 불필요한 호스트 세션 정리
+      cleanupHostTransports();
+
+      const joinBtn = document.getElementById('joinRoomBtn');
+      if (joinBtn) {
+        joinBtn.disabled = true;
+        joinBtn.textContent = '⏳ 중계방 연결 중...';
+      }
+      setJoinModalStatus(`⏳ 선생님 중계방(${code})에 접속 중입니다... 잠시만 기다려주세요!`, 'info');
+
+      connectStudentPeerWithRetry(code, sNum, 1, 3);
+    }
+
+    function connectStudentPeerWithRetry(code, sNum, attempt, maxAttempts) {
+      cleanupClientTransports();
+
+      let stateReceived = false;
+      let joinSyncInterval = null;
+      let attemptTimeout = null;
+
+      const cleanupTimers = () => {
+        if (joinSyncInterval) { clearInterval(joinSyncInterval); joinSyncInterval = null; }
+        if (attemptTimeout) { clearTimeout(attemptTimeout); attemptTimeout = null; }
+      };
+
+      const onReceiveStateSuccess = (singleStateData) => {
+        if (!singleStateData || !singleStateData.nation) return;
+        const wasFirstConnect = !stateReceived;
+        stateReceived = true;
+        cleanupTimers();
+
+        if (wasFirstConnect) {
+          const joinBtn = document.getElementById('joinRoomBtn');
+          if (joinBtn) {
+            joinBtn.disabled = false;
+            joinBtn.textContent = '🚀 내 국가 원격 컨트롤러로 접속하기';
+          }
+          closeRoomModal();
+          document.getElementById('briefingModal').classList.add('hidden');
+          document.getElementById('briefingModal').classList.remove('flex');
+          document.getElementById('gameRoot').classList.add('hidden');
+          const scView = document.getElementById('studentClientView');
+          scView.classList.remove('hidden');
+          scView.classList.add('flex');
+        }
+
+        if (pendingStudentAction) {
+          sendPayloadFromStudentToHost(pendingStudentAction);
+          pendingStudentAction = null;
+        }
+        renderStudentClientState(singleStateData);
+      };
+
+      const handleIncomingHostData = (data) => {
+        if (!data) return;
+        if (data.type === 'STATE' && data.nation) {
+          if (!data.studentId || Number(data.studentId) === Number(myStudentId)) {
+            onReceiveStateSuccess(data);
+          }
+        } else if (data.type === 'BULK_STATE' && Array.isArray(data.nations)) {
+          const myNation = data.nations.find((n) => Number(n.id) === Number(myStudentId));
+          if (myNation) {
+            onReceiveStateSuccess({
+              type: 'STATE',
+              nation: myNation,
+              round: data.round,
+              year: data.year,
+              generation: data.generation,
+              pollution: data.pollution,
+              nationsList: data.nationsList
+            });
+          }
+        }
+      };
+
+      const handleRetryOrFail = (reason) => {
+        if (stateReceived) return;
+        cleanupTimers();
+        if (attempt < maxAttempts) {
+          setJoinModalStatus(`🔄 중계방 신호를 다시 찾는 중입니다... (${attempt + 1}/${maxAttempts})`, 'info');
+          setTimeout(() => connectStudentPeerWithRetry(code, sNum, attempt + 1, maxAttempts), 800);
+        } else {
+          const joinBtn = document.getElementById('joinRoomBtn');
+          if (joinBtn) {
+            joinBtn.disabled = false;
+            joinBtn.textContent = '🚀 내 국가 원격 컨트롤러로 접속하기';
+          }
+          setJoinModalStatus(
+            reason === 'peer-unavailable'
+              ? `❌ 방 코드(${code})를 찾을 수 없습니다! 선생님 화면 우측 상단의 방 코드 4자리를 다시 확인해주세요.`
+              : `❌ 연결이 지연되고 있습니다. 방 코드(${code})를 확인하고 다시 한 번 눌러주세요!`,
+            'error'
+          );
+          updateStudentConnectionBadge(false, '🔴 연결 안 됨 (방 코드 재확인)');
+        }
+      };
+
+      attemptTimeout = setTimeout(() => handleRetryOrFail('timeout'), 8500);
+
+      const sendJoinPacketAll = () => {
+        sendPayloadFromStudentToHost({ type: 'JOIN', studentId: myStudentId });
+        if (pendingStudentAction) {
+          sendPayloadFromStudentToHost(pendingStudentAction);
+        }
+      };
+
+      // 1) 동일 브라우저 BroadcastChannel 연결
+      if (typeof BroadcastChannel !== 'undefined') {
+        try {
+          if (broadcastChannel) broadcastChannel.close();
+          broadcastChannel = new BroadcastChannel(`eco-civ-bc-${code}`);
+          broadcastChannel.onmessage = (ev) => {
+            if (ev && ev.data) handleIncomingHostData(ev.data);
+          };
+          sendJoinPacketAll();
+        } catch (e) {}
+      }
+
+      // 2) 표준 HTTPS(443 포트) EventSource 수신 (학교 태블릿 방화벽 100% 통과용)
+      if (typeof EventSource !== 'undefined') {
+        try {
+          const ntfyTopics = getNtfyTopics(code);
+          // since=30m 옵션으로 호스트가 미리 게시해둔 상태가 있으면 즉시 수신
+          clientEventSource = new EventSource(`${NTFY_BASE_URL}/${ntfyTopics.fromHost}/sse?since=30m`);
+          clientEventSource.onopen = () => {
+            sendJoinPacketAll();
+          };
+          clientEventSource.onmessage = (ev) => {
+            try {
+              const outer = JSON.parse(ev.data);
+              if (outer && outer.message) {
+                const parsed = JSON.parse(outer.message);
+                handleIncomingHostData(parsed);
+              }
+            } catch (e) {}
+          };
+        } catch (e) {}
+      }
+
+      // 3) MQTT over WebSocket 다중 브로커 연결 (443 포트 포함)
+      if (typeof mqtt !== 'undefined') {
+        const topicBase = getRoomTopicBase(code);
+        MQTT_BROKERS.forEach((brokerUrl) => {
+          try {
+            const mc = mqtt.connect(brokerUrl, {
+              connectTimeout: 5000,
+              reconnectPeriod: 2500,
+              clean: true
+            });
+            mc.on('connect', () => {
+              mc.subscribe(`${topicBase}/fromHost`, { qos: 0 }, () => {
+                sendJoinPacketAll();
+              });
+            });
+            mc.on('message', (topic, message) => {
+              try {
+                const parsed = JSON.parse(message.toString());
+                handleIncomingHostData(parsed);
+              } catch (e) {}
+            });
+            clientMqttList.push(mc);
+          } catch (e) {}
+        });
+      }
+
+      // 4) PeerJS WebRTC 연결
+      if (typeof Peer !== 'undefined') {
+        try {
+          clientPeer = new Peer(PEER_ICE_CONFIG);
+
+          clientPeer.on('open', () => {
+            const conn = clientPeer.connect(`eco-civ-room-${code}`, { reliable: true });
+            clientConn = conn;
+
+            conn.on('open', () => {
+              sendJoinPacketAll();
+            });
+
+            conn.on('data', (data) => {
+              handleIncomingHostData(data);
+            });
+          });
+
+          clientPeer.on('disconnected', () => {
+            if (clientPeer && !clientPeer.destroyed) {
+              try { clientPeer.reconnect(); } catch (e) {}
+            }
+          });
+
+          clientPeer.on('error', () => {});
+        } catch (e) {}
+      }
+
+      // 초기 JOIN 패킷 즉시 전송 및 주기적 재요청
+      sendJoinPacketAll();
+      joinSyncInterval = setInterval(() => {
+        if (!stateReceived) {
+          sendJoinPacketAll();
+        }
+      }, 1100);
+    }
+
+    function sendStudentAction(actionId) {
+      playSound('click');
+      myPlannedAction = actionId;
+      const act = ACTION_META[actionId] || ACTION_META[2];
+      const warTargetId = parseInt(document.getElementById('scWarTargetSelect').value, 10);
+      const payload = {
+        type: 'ACTION',
+        studentId: myStudentId,
+        actionId,
+        warTargetId,
+        msgId: `${myStudentId}-${Date.now()}`
+      };
+
+      // 버튼 즉시 하이라이트 피드백
+      for (let i = 1; i <= 4; i++) {
+        const btn = document.getElementById(`scBtn${i}`);
+        const bdg = document.getElementById(`scBtn${i}Badge`);
+        if (!btn) continue;
+        if (actionId === i) {
+          btn.classList.add('ring-2', 'ring-amber-300', 'scale-[1.01]');
+          if (bdg) bdg.textContent = '✅ 선택됨';
+        } else {
+          btn.classList.remove('ring-2', 'ring-amber-300', 'scale-[1.01]');
+          if (bdg) bdg.textContent = '선택';
+        }
+      }
+
+      const sent = sendPayloadFromStudentToHost(payload);
+      if (sent) {
+        const titleEl = document.getElementById(`scBtn${actionId}Title`);
+        const label = actionId === 5
+          ? `${act.icon} 5. 이웃 국가 침략 전쟁 선포!`
+          : (titleEl ? titleEl.textContent : act.name);
+        document.getElementById('scSelectedStatus').textContent = `📡 전송 완료! 내 선택: ${label}`;
+      } else {
+        pendingStudentAction = payload;
+        updateStudentConnectionBadge(false, '🔄 재연결 및 전송 중...');
+        document.getElementById('scSelectedStatus').textContent =
+          `⏳ 중계방과 재연결하여 [${act.name}] 선택을 전송하고 있습니다...`;
+        if (myRoomCode) {
+          connectStudentPeerWithRetry(myRoomCode, myStudentId, 1, 3);
+        }
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      initGame();
+      initTeacherPeerHost();
+      resizeCanvases();
+      requestAnimationFrame(animateVisuals);
+    });
+  </script>
+</body>
+</html>
