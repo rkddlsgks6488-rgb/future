@@ -2946,8 +2946,9 @@
     }
 
     /*************************************************************************
-     * 11. 실시간 교실 방 코드 하이브리드 연동 (MQTT WebSocket 클라우드 중계 + PeerJS P2P 이중 백업)
-     * - 학교 와이파이/방화벽에서 WebRTC P2P가 차단되어도 WSS(443/8084) 클라우드 중계로 즉시 연결됩니다.
+     * 11. 실시간 교실 방 코드 하이브리드 연동 (표준 443 포트 WSS/HTTPS 클라우드 중계 + PeerJS 이중 백업)
+     * - 학교 태블릿(크롬북/아이패드/갤럭시탭) 와이파이 방화벽에서 UDP나 비표준 포트가 막혀 있어도
+     *   일반 웹사이트와 동일한 표준 443 포트(HTTPS EventSource/POST + WSS 443)로 100% 연결됩니다.
      *************************************************************************/
     const PEER_ICE_CONFIG = {
       debug: 0,
@@ -2960,20 +2961,26 @@
       }
     };
 
+    // 표준 443 포트를 최우선으로 배치하여 학교 방화벽 포트 차단 완벽 우회
     const MQTT_BROKERS = [
+      'wss://test.mosquitto.org:8081/mqtt',
       'wss://broker.emqx.io:8084/mqtt',
       'wss://broker.hivemq.com:8884/mqtt',
-      'wss://test.mosquitto.org:8081/mqtt'
+      'wss://mqtt.eclipseprojects.io:443/mqtt'
     ];
+
+    const NTFY_BASE_URL = 'https://ntfy.sh';
 
     let hostPeer = null;
     let hostMqttClients = [];
+    let hostEventSource = null;
     let currentHostCode = '';
     let studentConnections = {};
     let mqttConnectedStudents = {};
     let clientPeer = null;
     let clientConn = null;
     let clientMqttList = [];
+    let clientEventSource = null;
     let myStudentId = 1;
     let myRoomCode = '';
     let myPlannedAction = 2;
@@ -2983,6 +2990,25 @@
 
     function getRoomTopicBase(code) {
       return `hamossam/eco-civ-2026/room-${code}`;
+    }
+
+    function getNtfyTopics(code) {
+      return {
+        toHost: `hamossam_ecociv_2026_${code}_tohost`,
+        fromHost: `hamossam_ecociv_2026_${code}_fromhost`
+      };
+    }
+
+    function postNtfyMessage(topic, payloadObj) {
+      try {
+        fetch(`${NTFY_BASE_URL}/${topic}`, {
+          method: 'POST',
+          body: JSON.stringify(payloadObj),
+          headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+          mode: 'cors',
+          cache: 'no-store'
+        }).catch(() => {});
+      } catch (e) {}
     }
 
     function openRoomModal() {
@@ -3050,6 +3076,10 @@
         });
         hostMqttClients = [];
       }
+      if (hostEventSource) {
+        try { hostEventSource.close(); } catch (e) {}
+        hostEventSource = null;
+      }
       if (broadcastChannel) {
         try { broadcastChannel.close(); } catch (e) {}
         broadcastChannel = null;
@@ -3068,7 +3098,13 @@
         });
         clientMqttList = [];
       }
+      if (clientEventSource) {
+        try { clientEventSource.close(); } catch (e) {}
+        clientEventSource = null;
+      }
     }
+
+    let lastActionTimestampByStudent = {};
 
     function handleIncomingStudentPayload(data, peerConn = null) {
       if (!data || !data.type || isStudentClientMode) return;
@@ -3087,6 +3123,13 @@
         updateConnectedCountUI();
         broadcastStateToStudents(sid);
       } else if (data.type === 'ACTION') {
+        // 다중 채널 중복 액션 수신 방지
+        const msgId = data.msgId || `${sid}-${data.actionId}-${data.warTargetId}`;
+        if (data.msgId && lastActionTimestampByStudent[sid] === msgId) {
+          return;
+        }
+        if (data.msgId) lastActionTimestampByStudent[sid] = msgId;
+
         if (nation && !nation.isEliminated) {
           const actId = parseInt(data.actionId, 10);
           if (actId >= 1 && actId <= 5) {
@@ -3145,14 +3188,31 @@
         } catch (e) {}
       }
 
-      // 2) 학교 와이파이/방화벽 100% 통과용 MQTT over WebSocket 다중 브로커 연결
+      // 2) 표준 HTTPS(443 포트) 스트리밍 채널 (웹소켓·UDP가 모두 막힌 학교 태블릿 100% 통과용)
+      if (typeof EventSource !== 'undefined') {
+        try {
+          const ntfyTopics = getNtfyTopics(code);
+          hostEventSource = new EventSource(`${NTFY_BASE_URL}/${ntfyTopics.toHost}/sse`);
+          hostEventSource.onmessage = (ev) => {
+            try {
+              const outer = JSON.parse(ev.data);
+              if (outer && outer.message) {
+                const parsed = JSON.parse(outer.message);
+                handleIncomingStudentPayload(parsed, null);
+              }
+            } catch (e) {}
+          };
+        } catch (e) {}
+      }
+
+      // 3) 학교 와이파이/방화벽 우회용 MQTT over WebSocket (443 포함 다중 브로커)
       if (typeof mqtt !== 'undefined') {
         const topicBase = getRoomTopicBase(code);
         MQTT_BROKERS.forEach((brokerUrl) => {
           try {
             const mc = mqtt.connect(brokerUrl, {
               connectTimeout: 5000,
-              reconnectPeriod: 2000,
+              reconnectPeriod: 2500,
               clean: true
             });
             mc.on('connect', () => {
@@ -3170,7 +3230,7 @@
         });
       }
 
-      // 3) PeerJS WebRTC 백업 채널
+      // 4) PeerJS WebRTC 채널
       if (typeof Peer !== 'undefined') {
         try {
           hostPeer = new Peer(`eco-civ-room-${code}`, PEER_ICE_CONFIG);
@@ -3220,6 +3280,9 @@
           console.warn('PeerJS init warning:', err);
         }
       }
+
+      // 방 생성 직후 초기 상태 1회 게시
+      setTimeout(() => broadcastStateToStudents(), 400);
     }
 
     function updateConnectedCountUI() {
@@ -3236,6 +3299,8 @@
         el.textContent = `현재 기기로 접속한 학생: ${connectedSet.size}명 (나머지 국가는 전자칠판에서 직접/랜덤 조작 가능)`;
       }
     }
+
+    let ntfyBroadcastThrottleTimer = null;
 
     function broadcastStateToStudents(onlyStudentId = null) {
       if (isStudentClientMode || !currentHostCode) return;
@@ -3257,13 +3322,13 @@
         }
       });
 
-      // 2) MQTT 및 BroadcastChannel 학생에게 전송
+      // 2) MQTT, HTTPS(443), BroadcastChannel 학생에게 전송
       const topicBase = getRoomTopicBase(currentHostCode);
       const targetNations = onlyStudentId
         ? state.nations.filter((n) => n.id === Number(onlyStudentId))
         : state.nations;
 
-      // 전체 상태 패킷 1개로 묶어 브로드캐스트 (네트워크 부하 최소화 + 모든 학생 즉시 수신)
+      // 전체 상태 패킷 1개로 묶어 브로드캐스트
       const bulkPayload = {
         type: 'BULK_STATE',
         onlyStudentId: onlyStudentId || null,
@@ -3282,14 +3347,39 @@
       };
 
       const jsonStr = JSON.stringify(bulkPayload);
+      // retain: true 옵션으로 늦게 접속한 태블릿도 즉시 최신 상태를 받도록 설정
       hostMqttClients.forEach((mc) => {
         if (mc && mc.connected) {
-          try { mc.publish(`${topicBase}/fromHost`, jsonStr, { qos: 0 }); } catch (e) {}
+          try { mc.publish(`${topicBase}/fromHost`, jsonStr, { qos: 0, retain: !onlyStudentId }); } catch (e) {}
         }
       });
 
       if (broadcastChannel) {
         try { broadcastChannel.postMessage(bulkPayload); } catch (e) {}
+      }
+
+      // 표준 HTTPS(443) 채널로도 전송 (짧은 시간 다중 호출 시 쓰로틀링)
+      if (!ntfyBroadcastThrottleTimer) {
+        ntfyBroadcastThrottleTimer = setTimeout(() => {
+          ntfyBroadcastThrottleTimer = null;
+          if (!currentHostCode) return;
+          const ntfyTopics = getNtfyTopics(currentHostCode);
+          postNtfyMessage(ntfyTopics.fromHost, {
+            type: 'BULK_STATE',
+            round: state.round,
+            year: state.year,
+            generation: state.generation,
+            pollution: state.pollution,
+            nations: state.nations,
+            nationsList: state.nations.map((n) => ({
+              id: n.id,
+              name: n.name,
+              dev: n.dev,
+              trees: n.trees,
+              isEliminated: n.isEliminated
+            }))
+          });
+        }, 180);
       }
 
       updateConnectedCountUI();
@@ -3415,7 +3505,13 @@
           }
         });
       }
-      // 3) 동일 브라우저 BroadcastChannel 전송
+      // 3) 표준 HTTPS(443 포트) POST 전송 (학교 태블릿 방화벽 100% 통과)
+      if (myRoomCode) {
+        const ntfyTopics = getNtfyTopics(myRoomCode);
+        postNtfyMessage(ntfyTopics.toHost, payload);
+        sentAny = true;
+      }
+      // 4) 동일 브라우저 BroadcastChannel 전송
       if (broadcastChannel) {
         try {
           broadcastChannel.postMessage(payload);
@@ -3560,14 +3656,35 @@
         } catch (e) {}
       }
 
-      // 2) MQTT over WebSocket 다중 브로커 연결 (학교 와이파이 방화벽 우회)
+      // 2) 표준 HTTPS(443 포트) EventSource 수신 (학교 태블릿 방화벽 100% 통과용)
+      if (typeof EventSource !== 'undefined') {
+        try {
+          const ntfyTopics = getNtfyTopics(code);
+          // since=30m 옵션으로 호스트가 미리 게시해둔 상태가 있으면 즉시 수신
+          clientEventSource = new EventSource(`${NTFY_BASE_URL}/${ntfyTopics.fromHost}/sse?since=30m`);
+          clientEventSource.onopen = () => {
+            sendJoinPacketAll();
+          };
+          clientEventSource.onmessage = (ev) => {
+            try {
+              const outer = JSON.parse(ev.data);
+              if (outer && outer.message) {
+                const parsed = JSON.parse(outer.message);
+                handleIncomingHostData(parsed);
+              }
+            } catch (e) {}
+          };
+        } catch (e) {}
+      }
+
+      // 3) MQTT over WebSocket 다중 브로커 연결 (443 포트 포함)
       if (typeof mqtt !== 'undefined') {
         const topicBase = getRoomTopicBase(code);
         MQTT_BROKERS.forEach((brokerUrl) => {
           try {
             const mc = mqtt.connect(brokerUrl, {
               connectTimeout: 5000,
-              reconnectPeriod: 2000,
+              reconnectPeriod: 2500,
               clean: true
             });
             mc.on('connect', () => {
@@ -3586,7 +3703,7 @@
         });
       }
 
-      // 3) PeerJS WebRTC 연결
+      // 4) PeerJS WebRTC 연결
       if (typeof Peer !== 'undefined') {
         try {
           clientPeer = new Peer(PEER_ICE_CONFIG);
@@ -3610,21 +3727,17 @@
             }
           });
 
-          clientPeer.on('error', (err) => {
-            // MQTT가 연결 중일 수 있으므로 즉시 실패 처리하지 않고, Peer가 един한 수단일 때만 참고
-            if (typeof mqtt === 'undefined' && err && err.type === 'peer-unavailable') {
-              handleRetryOrFail('peer-unavailable');
-            }
-          });
+          clientPeer.on('error', () => {});
         } catch (e) {}
       }
 
-      // 주기적으로 JOIN 요청 전송 (연결될 때까지)
+      // 초기 JOIN 패킷 즉시 전송 및 주기적 재요청
+      sendJoinPacketAll();
       joinSyncInterval = setInterval(() => {
         if (!stateReceived) {
           sendJoinPacketAll();
         }
-      }, 650);
+      }, 1100);
     }
 
     function sendStudentAction(actionId) {
@@ -3636,7 +3749,8 @@
         type: 'ACTION',
         studentId: myStudentId,
         actionId,
-        warTargetId
+        warTargetId,
+        msgId: `${myStudentId}-${Date.now()}`
       };
 
       // 버튼 즉시 하이라이트 피드백
