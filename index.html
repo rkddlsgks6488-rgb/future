@@ -773,7 +773,7 @@
         <div class="text-xs font-extrabold text-emerald-300 mb-2">📱 [학생용 기기 접속하기] (학생 태블릿/PC에서 입력)</div>
         <div class="grid grid-cols-2 gap-2 mb-2">
           <input id="joinRoomCodeInput" type="text" maxlength="4" placeholder="방 코드 4자리 (예: 4821)" class="bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-xs text-white" />
-          <input id="joinStudentNumInput" type="number" min="1" max="30" placeholder="내 번호 (1~30)" class="bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-xs text-white" />
+          <input id="joinStudentNumInput" type="text" maxlength="20" placeholder="내 번호 또는 이름 (예: 5, 홍길동)" class="bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-xs text-white" />
         </div>
         <div id="joinRoomStatusMsg" class="hidden text-xs font-extrabold px-3 py-2 rounded-xl mb-2 text-center"></div>
         <button id="joinRoomBtn" onclick="joinAsStudentClient()" class="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition">
@@ -2982,11 +2982,73 @@
     let clientMqttList = [];
     let clientEventSource = null;
     let myStudentId = 1;
+    let myStudentIdentifier = '';
     let myRoomCode = '';
     let myPlannedAction = 2;
     let pendingStudentAction = null;
     let isStudentClientMode = false;
     let broadcastChannel = null;
+
+    function normalizeStudentKey(val) {
+      return String(val === undefined || val === null ? '' : val).trim();
+    }
+
+    function parseNumericStudentInput(raw) {
+      const key = normalizeStudentKey(raw);
+      const m = key.match(/^(\d+)\s*번?$/);
+      if (!m) return null;
+      const num = parseInt(m[1], 10);
+      return Number.isFinite(num) && num >= 1 ? num : null;
+    }
+
+    function doesNationMatchIdentifier(nation, rawIdentifier) {
+      if (!nation) return false;
+      const key = normalizeStudentKey(rawIdentifier);
+      if (!key) return false;
+
+      const label = normalizeStudentKey(nation.studentLabel);
+      if (label && label.toLowerCase() === key.toLowerCase()) {
+        return true;
+      }
+
+      const num = parseNumericStudentInput(key);
+      if (num !== null) {
+        if (label && (label === String(num) || label === `${num}번`)) {
+          return true;
+        }
+        if (Number(nation.id) === num) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function resolveStudentNation(nationsList, rawIdentifier) {
+      if (!Array.isArray(nationsList) || nationsList.length === 0) return null;
+      const key = normalizeStudentKey(rawIdentifier);
+      if (!key) return null;
+
+      // 1) 이름(studentLabel) 정확 일치 우선 (예: "홍길동", "5번")
+      const byExactLabel = nationsList.find((n) => {
+        const label = normalizeStudentKey(n.studentLabel);
+        return label && label.toLowerCase() === key.toLowerCase();
+      });
+      if (byExactLabel) return byExactLabel;
+
+      // 2) 숫자 또는 "N번" 형태 매칭 (예: "5", "5번")
+      const num = parseNumericStudentInput(key);
+      if (num !== null) {
+        const byNumericLabel = nationsList.find((n) => {
+          const label = normalizeStudentKey(n.studentLabel);
+          return label === String(num) || label === `${num}번`;
+        });
+        if (byNumericLabel) return byNumericLabel;
+
+        const byId = nationsList.find((n) => Number(n.id) === num);
+        if (byId) return byId;
+      }
+      return null;
+    }
 
     function getRoomTopicBase(code) {
       return `hamossam/eco-civ-2026/room-${code}`;
@@ -3034,7 +3096,9 @@
       const codeInput = document.getElementById('joinRoomCodeInput');
       const numInput = document.getElementById('joinStudentNumInput');
       if (codeInput && myRoomCode) codeInput.value = myRoomCode;
-      if (numInput && myStudentId) numInput.value = myStudentId;
+      if (numInput && (myStudentIdentifier || myStudentId)) {
+        numInput.value = myStudentIdentifier || myStudentId;
+      }
       openRoomModal();
     }
 
@@ -3106,18 +3170,62 @@
 
     let lastActionTimestampByStudent = {};
 
+    function sendJoinErrorToStudent(rawKey, message, peerConn = null) {
+      const errPayload = {
+        type: 'JOIN_ERROR',
+        targetKey: normalizeStudentKey(rawKey),
+        message
+      };
+      if (peerConn) {
+        if (peerConn.open) {
+          try { peerConn.send(errPayload); } catch (e) {}
+        } else {
+          peerConn.once('open', () => {
+            try { peerConn.send(errPayload); } catch (e) {}
+          });
+        }
+      }
+      if (currentHostCode) {
+        const topicBase = getRoomTopicBase(currentHostCode);
+        const jsonStr = JSON.stringify(errPayload);
+        hostMqttClients.forEach((mc) => {
+          if (mc && mc.connected) {
+            try { mc.publish(`${topicBase}/fromHost`, jsonStr, { qos: 0, retain: false }); } catch (e) {}
+          }
+        });
+        if (broadcastChannel) {
+          try { broadcastChannel.postMessage(errPayload); } catch (e) {}
+        }
+        const ntfyTopics = getNtfyTopics(currentHostCode);
+        postNtfyMessage(ntfyTopics.fromHost, errPayload);
+      }
+    }
+
     function handleIncomingStudentPayload(data, peerConn = null) {
       if (!data || !data.type || isStudentClientMode) return;
-      const sid = Math.max(1, Math.min(state.nations.length, parseInt(data.studentId, 10) || 1));
-      const nation = state.nations.find((n) => n.id === sid);
+      const rawKey = data.studentKey !== undefined ? data.studentKey : data.studentId;
+      const nation = resolveStudentNation(state.nations, rawKey);
 
+      if (!nation) {
+        if (data.type === 'JOIN') {
+          const disp = normalizeStudentKey(rawKey) || '(빈 값)';
+          sendJoinErrorToStudent(
+            rawKey,
+            `❌ 명단에서 '${disp}' 학생을 찾을 수 없습니다! (현재 참여 인원: ${state.nations.length}명 — 선생님 화면의 번호 또는 이름을 확인해주세요.)`,
+            peerConn
+          );
+        }
+        return;
+      }
+
+      const sid = nation.id;
       if (peerConn) {
         peerConn._studentId = sid;
         studentConnections[sid] = peerConn;
       } else {
         mqttConnectedStudents[sid] = Date.now();
       }
-      if (nation) nation.connectedPeer = true;
+      nation.connectedPeer = true;
 
       if (data.type === 'JOIN') {
         updateConnectedCountUI();
@@ -3130,7 +3238,7 @@
         }
         if (data.msgId) lastActionTimestampByStudent[sid] = msgId;
 
-        if (nation && !nation.isEliminated) {
+        if (!nation.isEliminated) {
           const actId = parseInt(data.actionId, 10);
           if (actId >= 1 && actId <= 5) {
             nation.plannedAction = actId;
@@ -3157,6 +3265,7 @@
         nationsList: state.nations.map((n) => ({
           id: n.id,
           name: n.name,
+          studentLabel: n.studentLabel,
           dev: n.dev,
           trees: n.trees,
           isEliminated: n.isEliminated
@@ -3340,6 +3449,7 @@
         nationsList: state.nations.map((n) => ({
           id: n.id,
           name: n.name,
+          studentLabel: n.studentLabel,
           dev: n.dev,
           trees: n.trees,
           isEliminated: n.isEliminated
@@ -3374,6 +3484,7 @@
             nationsList: state.nations.map((n) => ({
               id: n.id,
               name: n.name,
+              studentLabel: n.studentLabel,
               dev: n.dev,
               trees: n.trees,
               isEliminated: n.isEliminated
@@ -3523,18 +3634,24 @@
 
     function joinAsStudentClient() {
       const code = document.getElementById('joinRoomCodeInput').value.trim();
-      const sNum = parseInt(document.getElementById('joinStudentNumInput').value, 10);
+      const identRaw = normalizeStudentKey(document.getElementById('joinStudentNumInput').value);
       if (!code || code.length !== 4) {
         setJoinModalStatus('⚠️ 선생님 화면의 4자리 방 코드를 정확히 입력해주세요!', 'error');
         return;
       }
-      if (!sNum || sNum < 1 || sNum > 30) {
-        setJoinModalStatus('⚠️ 내 번호(1~30번)를 정확히 입력해주세요!', 'error');
+      if (!identRaw) {
+        setJoinModalStatus('⚠️ 내 번호(1~30) 또는 학생 이름을 입력해주세요!', 'error');
+        return;
+      }
+      const parsedNum = parseNumericStudentInput(identRaw);
+      if (parsedNum !== null && (parsedNum < 1 || parsedNum > 30)) {
+        setJoinModalStatus('⚠️ 번호는 1~30 사이로 입력해주세요!', 'error');
         return;
       }
 
       playSound('click');
-      myStudentId = sNum;
+      myStudentIdentifier = identRaw;
+      myStudentId = parsedNum || 0;
       myRoomCode = code;
       isStudentClientMode = true;
 
@@ -3548,13 +3665,14 @@
       }
       setJoinModalStatus(`⏳ 선생님 중계방(${code})에 접속 중입니다... 잠시만 기다려주세요!`, 'info');
 
-      connectStudentPeerWithRetry(code, sNum, 1, 3);
+      connectStudentPeerWithRetry(code, identRaw, 1, 3);
     }
 
-    function connectStudentPeerWithRetry(code, sNum, attempt, maxAttempts) {
+    function connectStudentPeerWithRetry(code, studentKey, attempt, maxAttempts) {
       cleanupClientTransports();
 
       let stateReceived = false;
+      let joinRejected = false;
       let joinSyncInterval = null;
       let attemptTimeout = null;
 
@@ -3593,13 +3711,40 @@
 
       const handleIncomingHostData = (data) => {
         if (!data) return;
+        if (data.type === 'JOIN_ERROR') {
+          if (
+            !stateReceived &&
+            normalizeStudentKey(data.targetKey).toLowerCase() === normalizeStudentKey(studentKey).toLowerCase()
+          ) {
+            joinRejected = true;
+            cleanupTimers();
+            cleanupClientTransports();
+            const joinBtn = document.getElementById('joinRoomBtn');
+            if (joinBtn) {
+              joinBtn.disabled = false;
+              joinBtn.textContent = '🚀 내 국가 원격 컨트롤러로 접속하기';
+            }
+            setJoinModalStatus(
+              data.message || '❌ 명단에서 해당 번호 또는 이름을 찾을 수 없습니다.',
+              'error'
+            );
+          }
+          return;
+        }
         if (data.type === 'STATE' && data.nation) {
-          if (!data.studentId || Number(data.studentId) === Number(myStudentId)) {
+          const matched =
+            doesNationMatchIdentifier(data.nation, studentKey) ||
+            (myStudentId > 0 && Number(data.nation.id) === Number(myStudentId));
+          if (matched) {
+            myStudentId = Number(data.nation.id);
             onReceiveStateSuccess(data);
           }
         } else if (data.type === 'BULK_STATE' && Array.isArray(data.nations)) {
-          const myNation = data.nations.find((n) => Number(n.id) === Number(myStudentId));
+          const myNation =
+            resolveStudentNation(data.nations, studentKey) ||
+            (myStudentId > 0 ? data.nations.find((n) => Number(n.id) === Number(myStudentId)) : null);
           if (myNation) {
+            myStudentId = Number(myNation.id);
             onReceiveStateSuccess({
               type: 'STATE',
               nation: myNation,
@@ -3614,11 +3759,11 @@
       };
 
       const handleRetryOrFail = (reason) => {
-        if (stateReceived) return;
+        if (stateReceived || joinRejected) return;
         cleanupTimers();
         if (attempt < maxAttempts) {
           setJoinModalStatus(`🔄 중계방 신호를 다시 찾는 중입니다... (${attempt + 1}/${maxAttempts})`, 'info');
-          setTimeout(() => connectStudentPeerWithRetry(code, sNum, attempt + 1, maxAttempts), 800);
+          setTimeout(() => connectStudentPeerWithRetry(code, studentKey, attempt + 1, maxAttempts), 800);
         } else {
           const joinBtn = document.getElementById('joinRoomBtn');
           if (joinBtn) {
@@ -3628,7 +3773,7 @@
           setJoinModalStatus(
             reason === 'peer-unavailable'
               ? `❌ 방 코드(${code})를 찾을 수 없습니다! 선생님 화면 우측 상단의 방 코드 4자리를 다시 확인해주세요.`
-              : `❌ 연결이 지연되고 있습니다. 방 코드(${code})를 확인하고 다시 한 번 눌러주세요!`,
+              : `❌ 연결이 지연되고 있습니다. 방 코드(${code})와 번호/이름을 확인하고 다시 한 번 눌러주세요!`,
             'error'
           );
           updateStudentConnectionBadge(false, '🔴 연결 안 됨 (방 코드 재확인)');
@@ -3638,7 +3783,11 @@
       attemptTimeout = setTimeout(() => handleRetryOrFail('timeout'), 8500);
 
       const sendJoinPacketAll = () => {
-        sendPayloadFromStudentToHost({ type: 'JOIN', studentId: myStudentId });
+        sendPayloadFromStudentToHost({
+          type: 'JOIN',
+          studentId: myStudentId || studentKey,
+          studentKey
+        });
         if (pendingStudentAction) {
           sendPayloadFromStudentToHost(pendingStudentAction);
         }
@@ -3748,6 +3897,7 @@
       const payload = {
         type: 'ACTION',
         studentId: myStudentId,
+        studentKey: myStudentIdentifier || myStudentId,
         actionId,
         warTargetId,
         msgId: `${myStudentId}-${Date.now()}`
@@ -3780,7 +3930,7 @@
         document.getElementById('scSelectedStatus').textContent =
           `⏳ 중계방과 재연결하여 [${act.name}] 선택을 전송하고 있습니다...`;
         if (myRoomCode) {
-          connectStudentPeerWithRetry(myRoomCode, myStudentId, 1, 3);
+          connectStudentPeerWithRetry(myRoomCode, myStudentIdentifier || myStudentId, 1, 3);
         }
       }
     }
