@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>100년의 유산: 25개국 미래 생존 & 발전 대항전 (6학년 도덕 중계 시뮬레이터)</title>
+  <title>100년의 유산: 최대 30개국 미래 생존 & 발전 대항전 (6학년 도덕 중계 시뮬레이터)</title>
   <!-- Pretendard 한글 웹폰트 -->
   <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
   <!-- Tailwind CSS CDN -->
@@ -287,7 +287,7 @@
         <div id="scBtn5Box" class="pt-2 border-t border-slate-700 rounded-xl p-2 transition">
           <label class="text-xs font-extrabold text-amber-300 block mb-1">⚔️ 5. 다른 국가에 자원 전쟁 선포하기</label>
           <div class="flex gap-2">
-            <select id="scWarTargetSelect" onchange="if(myPlannedAction===5) sendStudentAction(5);" class="flex-1 bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-xs text-white">
+            <select id="scWarTargetSelect" onchange="onStudentWarTargetChange(this.value)" class="flex-1 bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-xs text-white">
               <option value="-1">🎯 1등 국가 또는 랜덤 타깃 공격</option>
             </select>
             <button id="scBtn5" onclick="sendStudentAction(5)" class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-xs shrink-0">
@@ -657,8 +657,8 @@
   <!-- ==================== 모달 A: 🎲 실시간 주사위 전쟁 결투 모달 (War Dice Showdown) ==================== -->
   <div id="warDiceModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/90 backdrop-blur-md no-print">
     <div class="max-w-lg w-full glass-panel rounded-3xl p-6 border-2 border-red-500 shadow-2xl text-center">
-      <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/20 border border-red-400/50 text-red-300 text-xs font-black mb-2">
-        ⚔️ 자원 침략 전쟁 발발! (지구 공동 오염도 +8% 증가!)
+      <div id="warModalPollBadge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/20 border border-red-400/50 text-red-300 text-xs font-black mb-2">
+        ⚔️ 자원 침략 전쟁 발발! (지구 공동 오염도 증가!)
       </div>
       <h2 class="text-2xl font-black text-white">운명의 주사위 대결!</h2>
       <p class="text-xs text-slate-300 mt-1">
@@ -1688,9 +1688,11 @@
         const customStudent = namesList[i - 1] ? namesList[i - 1].trim() : `${i}번`;
         const displayName = `${cData.flag} ${cData.countryName} (${customStudent})`;
         const isPeerConnected = Boolean(
-          typeof studentConnections !== 'undefined' &&
-          studentConnections[i] &&
-          studentConnections[i].open
+          (typeof studentConnections !== 'undefined' &&
+            studentConnections[i] &&
+            studentConnections[i].open) ||
+          (typeof mqttConnectedStudents !== 'undefined' &&
+            mqttConnectedStudents[i])
         );
         const defaultAction = 2;
 
@@ -1708,6 +1710,8 @@
           nextGenDebtStacks: 0,
           plannedAction: defaultAction,
           warTargetId: -1,
+          lastActionSeq: 0,
+          lastActionTs: Date.now(),
           terrainType: cData.initTrees >= 115 ? 'forest' : (cData.initDev >= 40 ? 'factory' : 'village'),
           isEliminated: false,
           connectedPeer: isPeerConnected
@@ -1723,6 +1727,15 @@
     }
 
     function initGame() {
+      if (typeof lastActionTimestampByStudent !== 'undefined') lastActionTimestampByStudent = {};
+      if (typeof lastActionSeqByStudent !== 'undefined') lastActionSeqByStudent = {};
+      if (typeof seenActionMsgIds !== 'undefined' && seenActionMsgIds.clear) seenActionMsgIds.clear();
+      if (typeof mqttConnectedStudents !== 'undefined') {
+        Object.keys(mqttConnectedStudents).forEach((sid) => {
+          if (Number(sid) > studentCount) delete mqttConnectedStudents[sid];
+        });
+      }
+
       state.round = 1;
       state.year = ROUND_YEARS[0];
       state.generation = 1;
@@ -2185,11 +2198,19 @@
     /*************************************************************************
      * 6. 국가별 행동 지정, 랜덤 학생 지목, 즉시 주사위 전쟁 결투
      *************************************************************************/
+    let isImmediateWarRunning = false;
+
+    function getWarPollIncrease() {
+      const aliveCount = Math.max(2, getAliveNations().length || state.nations.length || 2);
+      return Math.max(3, Math.round(20 / Math.sqrt(aliveCount)));
+    }
+
     function setNationAction(nationId, actionId) {
       playSound('click');
       const nation = state.nations.find((n) => n.id === nationId);
       if (!nation || nation.isEliminated) return;
       nation.plannedAction = actionId;
+      nation.lastActionTs = Date.now();
       if (actionId === 5) {
         const targetSelect = document.getElementById('warTargetSelect');
         if (targetSelect) nation.warTargetId = parseInt(targetSelect.value, 10);
@@ -2199,22 +2220,28 @@
 
     function updateNationWarTarget(targetVal) {
       const nation = state.nations.find((n) => n.id === state.selectedNationId);
-      if (!nation) return;
+      if (!nation || nation.isEliminated) return;
       nation.warTargetId = parseInt(targetVal, 10);
       nation.plannedAction = 5;
+      nation.lastActionTs = Date.now();
       renderAll();
     }
 
     function setAllNationsAction(actionId) {
       playSound('click');
+      const nowTs = Date.now();
       state.nations.forEach((n) => {
-        if (!n.isEliminated) n.plannedAction = actionId;
+        if (!n.isEliminated) {
+          n.plannedAction = actionId;
+          n.lastActionTs = nowTs;
+        }
       });
       renderAll();
     }
 
     function assignRandomActionsToAll() {
       playSound('dice');
+      const nowTs = Date.now();
       state.nations.forEach((n) => {
         if (n.isEliminated || n.connectedPeer) return;
         const r = Math.random();
@@ -2226,6 +2253,7 @@
           n.plannedAction = 5;                  // 10% 전쟁 선포!
           n.warTargetId = -1;
         }
+        n.lastActionTs = nowTs;
       });
       showBroadcastBanner('🎲', '전체 국가 랜덤 성향 배정 완료!', '각 학생 국가의 이번 라운드 행동과 전쟁 여부가 흥미진진하게 배정되었습니다!');
       renderAll();
@@ -2244,15 +2272,23 @@
 
     // 즉시 주사위 전쟁 모달 실행 (교실 발표용 하이라이트!)
     function launchImmediateWarModal() {
+      if (isImmediateWarRunning || state.isExecuting || state.isGameOver) return;
       const attacker = state.nations.find((n) => n.id === state.selectedNationId);
       if (!attacker || attacker.isEliminated) return;
 
       const defender = pickWarDefender(attacker);
       if (!defender) return;
 
+      isImmediateWarRunning = true;
       playSound('war');
       triggerScreenShake('heavy');
       fireWarLaserBetween(attacker.id, defender.id);
+
+      const pollIncPreview = getWarPollIncrease();
+      const pollBadge = document.getElementById('warModalPollBadge');
+      if (pollBadge) {
+        pollBadge.textContent = `⚔️ 자원 침략 전쟁 발발! (지구 공동 오염도 +${pollIncPreview}% 증가!)`;
+      }
 
       const modal = document.getElementById('warDiceModal');
       modal.classList.remove('hidden');
@@ -2265,8 +2301,15 @@
       document.getElementById('warResultBox').textContent = '운명의 주사위가 구르고 있습니다...';
 
       setTimeout(() => {
+        isImmediateWarRunning = false;
+        if (state.isGameOver) return;
         playSound('dice');
         const outcome = resolveWarBetween(attacker, defender, true);
+        // 즉시 전투를 이미 치렀으므로 같은 라운드에 중복 전쟁이 실행되지 않도록 적정 개발로 복귀
+        if (attacker.plannedAction === 5) {
+          attacker.plannedAction = 2;
+          attacker.lastActionTs = Date.now();
+        }
         const diceFaces = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
         document.getElementById('warAttackerDice').textContent = diceFaces[outcome.atkRoll - 1];
         document.getElementById('warDefenderDice').textContent = diceFaces[outcome.defRoll - 1];
@@ -2274,6 +2317,17 @@
         document.getElementById('warDefenderPower').textContent = `주사위 ${outcome.defRoll} (총 방어력 ${outcome.defScore})`;
         document.getElementById('warResultBox').innerHTML = outcome.summaryHtml;
         renderAll();
+
+        if (state.pollution >= 100 || getAliveNations().length === 0) {
+          state.autoSpeed = 0;
+          state.flowProgress = 0;
+          state.isGameOver = true;
+          updateAutoSpeedUI();
+          setTimeout(() => {
+            closeWarDiceModal();
+            triggerClassEnding('BAD_EASTER');
+          }, 1200);
+        }
       }, 650);
     }
 
@@ -2299,8 +2353,10 @@
     function resolveWarBetween(attacker, defender, isImmediate = false) {
       state.totalWars += 1;
       // 전쟁이 일어날 때마다 지구 공동 오염도 상승 & 양국 숲 불탐!
-      const pollIncrease = Math.max(3, Math.round(28 / Math.sqrt(state.nations.length)));
-      state.pollution = Math.min(100, state.pollution + pollIncrease);
+      const pollIncrease = getWarPollIncrease();
+      if (isImmediate) {
+        state.pollution = Math.max(0, Math.min(100, state.pollution + pollIncrease));
+      }
 
       attacker.trees = Math.max(0, attacker.trees - 10);
       defender.trees = Math.max(0, defender.trees - 12);
@@ -2341,7 +2397,7 @@
       checkNationElimination(defender);
 
       addBroadcastLog(`⚔️ <strong>[전쟁 중계]</strong> ${summaryHtml}`);
-      return { atkRoll, defRoll, atkScore, defScore, summaryHtml };
+      return { atkRoll, defRoll, atkScore, defScore, pollIncrease, summaryHtml };
     }
 
     function checkNationElimination(nation) {
@@ -2398,19 +2454,25 @@
 
       const aliveNations = getAliveNations();
       if (aliveNations.length === 0) {
+        state.autoSpeed = 0;
+        updateAutoSpeedUI();
         triggerClassEnding('BAD_EASTER');
         return;
       }
 
-      // 참여 인원수에 비례해 지구 공동 오염도 증감 폭 스케일링 (25명일 때와 4명일 때 모두 밸런스 유지!)
-      const pollScale = 4 / Math.max(2, aliveNations.length);
+      // 참여 생존 국가 수의 평균으로 지구 공동 오염도 증감 폭 스케일링 (인원수와 무관하게 일관된 밸런스 유지)
+      const startAliveCount = Math.max(1, aliveNations.length);
+      const pollScale = 1 / startAliveCount;
       let netPollDelta = 0;
       let warCountThisRound = 0;
 
       // 1) 각 국가의 고유 특성 및 맞춤 선택 행동 처리
       aliveNations.forEach((n) => {
+        // 같은 라운드 앞선 전쟁으로 방금 멸망한 국가는 행동 및 오염도 계산에서 제외
+        if (n.isEliminated || n.trees <= 0) return;
+
         const debtPen = n.activeDebtStacks * 12;
-        const ch = (n.choices && n.choices[n.plannedAction]) || { trees: -12, dev: 25, poll: 4 };
+        const ch = (n.choices && n.choices[n.plannedAction]) || { trees: -10, dev: 27, poll: 3 };
 
         if (n.plannedAction === 1) {
           // 🏭 국가별 대규모 개발 (랜덤 대박 30% 확률로 +15점 추가 보너스!)
@@ -2452,12 +2514,21 @@
           if (defender) {
             warCountThisRound++;
             fireWarLaserBetween(n.id, defender.id);
-            resolveWarBetween(n, defender, false);
+            const warOutcome = resolveWarBetween(n, defender, false);
+            netPollDelta += warOutcome.pollIncrease;
           }
         }
 
         checkNationElimination(n);
       });
+
+      // 지구 숲의 자연 탄소 정화 작용 (평균 나무가 풍성할수록 기본 적정 개발의 미세 오염을 자연 흡수)
+      const currentAliveAfterActions = getAliveNations();
+      const avgTreesBeforeRegen = currentAliveAfterActions.length > 0
+        ? currentAliveAfterActions.reduce((s, n) => s + n.trees, 0) / currentAliveAfterActions.length
+        : 0;
+      const forestNaturalPurify = avgTreesBeforeRegen >= 75 ? 1.5 : (avgTreesBeforeRegen >= 45 ? 0.8 : 0);
+      netPollDelta -= forestNaturalPurify;
 
       state.pollution = Math.max(0, Math.min(100, Math.round(state.pollution + netPollDelta)));
 
@@ -2472,6 +2543,7 @@
       const randomEv = RANDOM_EVENTS_POOL[Math.floor(Math.random() * RANDOM_EVENTS_POOL.length)];
       document.getElementById('randomEventBannerText').textContent = `${randomEv.title} — ${randomEv.desc}`;
       randomEv.apply(state.nations);
+      state.nations.forEach((n) => checkNationElimination(n));
       addBroadcastLog(`🎲 <strong>[${state.year}년 랜덤 이벤트: ${randomEv.title}]</strong> ${randomEv.desc}`);
 
       // 3) 오염도에 따른 자연재해 판정 (50% 이상: 40%, 70% 이상: 80%)
@@ -2506,18 +2578,26 @@
       }
 
       // 4) 살아남은 각 국가의 숲 자연 재생 (30그루 이상: +20%, 30그루 미만: +5%)
+      const nowAfterRoundTs = Date.now();
       getAliveNations().forEach((n) => {
         const rate = n.trees < 30 ? 0.05 : 0.20;
         const regen = Math.round(n.trees * rate);
         n.trees = Math.min(150, n.trees + regen);
         // 전쟁을 한 뒤 다음 라운드 기본 행동은 적정 개발로 복귀 (학생 화면에도 즉시 동기화됨)
-        if (n.plannedAction === 5) n.plannedAction = 2;
+        if (n.plannedAction === 5) {
+          n.plannedAction = 2;
+          n.lastActionTs = nowAfterRoundTs;
+        }
       });
 
       renderAll();
 
       // 5) 지구 공멸(오염도 100% 또는 생존 국가 0곳) 체크
       if (state.pollution >= 100 || getAliveNations().length === 0) {
+        state.autoSpeed = 0;
+        state.flowProgress = 0;
+        state.isGameOver = true;
+        updateAutoSpeedUI();
         setTimeout(() => triggerClassEnding('BAD_EASTER'), 900);
         return;
       }
@@ -2720,6 +2800,9 @@
     function triggerClassEnding(endingKey) {
       state.isGameOver = true;
       state.isExecuting = false;
+      state.autoSpeed = 0;
+      state.flowProgress = 0;
+      updateAutoSpeedUI();
       currentEndingKey = endingKey;
 
       const info = ENDINGS_DATA[endingKey];
@@ -2841,8 +2924,28 @@
       ctx.fillStyle = '#f8fafc';
       ctx.font = '22px Pretendard, sans-serif';
       ctx.fillText('✍️ 나의 깨달음과 미래 세대 지킴이 다짐:', 56, 240);
-      ctx.fillText(reflection.substring(0, 90), 56, 290);
-      if (reflection.length > 90) ctx.fillText(reflection.substring(90, 180), 56, 330);
+
+      const maxLineWidth = 880;
+      const wrappedLines = [];
+      let currentLine = '';
+      for (const ch of reflection) {
+        if (ch === '\n') {
+          wrappedLines.push(currentLine);
+          currentLine = '';
+          continue;
+        }
+        const testLine = currentLine + ch;
+        if (ctx.measureText(testLine).width > maxLineWidth && currentLine.length > 0) {
+          wrappedLines.push(currentLine);
+          currentLine = ch;
+        } else {
+          currentLine = testLine;
+        }
+      }
+      if (currentLine) wrappedLines.push(currentLine);
+      wrappedLines.slice(0, 8).forEach((line, idx) => {
+        ctx.fillText(line, 56, 290 + idx * 36);
+      });
 
       ctx.fillStyle = '#a7f3d0';
       ctx.font = 'bold 18px Pretendard, sans-serif';
@@ -2975,6 +3078,8 @@
     let hostMqttClients = [];
     let hostEventSource = null;
     let currentHostCode = '';
+    let hostSessionId = '';
+    let hostStateSeq = 0;
     let studentConnections = {};
     let mqttConnectedStudents = {};
     let clientPeer = null;
@@ -2985,6 +3090,13 @@
     let myStudentIdentifier = '';
     let myRoomCode = '';
     let myPlannedAction = 2;
+    let myWarTargetId = -1;
+    let myActionSeq = 0;
+    let myLastActionSentAt = 0;
+    let myLastActionRound = 1;
+    let currentClientRound = 1;
+    let lastReceivedHostSessionId = '';
+    let lastReceivedStateSeq = -1;
     let pendingStudentAction = null;
     let isStudentClientMode = false;
     let broadcastChannel = null;
@@ -3169,10 +3281,13 @@
     }
 
     let lastActionTimestampByStudent = {};
+    let lastActionSeqByStudent = {};
+    let seenActionMsgIds = new Set();
 
     function sendJoinErrorToStudent(rawKey, message, peerConn = null) {
       const errPayload = {
         type: 'JOIN_ERROR',
+        hostSessionId,
         targetKey: normalizeStudentKey(rawKey),
         message
       };
@@ -3231,12 +3346,37 @@
         updateConnectedCountUI();
         broadcastStateToStudents(sid);
       } else if (data.type === 'ACTION') {
-        // 다중 채널 중복 액션 수신 방지
-        const msgId = data.msgId || `${sid}-${data.actionId}-${data.warTargetId}`;
-        if (data.msgId && lastActionTimestampByStudent[sid] === msgId) {
+        // 다중 채널(PeerJS + 4개 MQTT 브로커 + ntfy) 중복 및 지연 역전 패킷 완벽 차단
+        const msgId = data.msgId ? String(data.msgId) : '';
+        if (msgId && seenActionMsgIds.has(msgId)) {
           return;
         }
-        if (data.msgId) lastActionTimestampByStudent[sid] = msgId;
+        const incomingTs = Number(data.clientTs) || 0;
+        const incomingSeq = Number(data.actionSeq) || 0;
+        const prevTs = Number(lastActionTimestampByStudent[sid]) || 0;
+        const prevSeq = Number(lastActionSeqByStudent[sid]) || 0;
+
+        if (incomingSeq > 0 && prevSeq > 0 && incomingSeq < prevSeq) {
+          return;
+        }
+        if (incomingTs > 0 && prevTs > 0 && incomingTs < prevTs) {
+          return;
+        }
+        if (incomingSeq > 0 && incomingSeq === prevSeq && incomingTs > 0 && incomingTs <= prevTs) {
+          return;
+        }
+
+        if (msgId) {
+          seenActionMsgIds.add(msgId);
+          if (seenActionMsgIds.size > 1000) {
+            seenActionMsgIds.clear();
+            seenActionMsgIds.add(msgId);
+          }
+        }
+        if (incomingTs > 0) lastActionTimestampByStudent[sid] = incomingTs;
+        if (incomingSeq > 0) lastActionSeqByStudent[sid] = incomingSeq;
+        nation.lastActionSeq = incomingSeq || (nation.lastActionSeq || 0) + 1;
+        nation.lastActionTs = Math.max(Date.now(), incomingTs);
 
         if (!nation.isEliminated) {
           const actId = parseInt(data.actionId, 10);
@@ -3253,9 +3393,11 @@
       }
     }
 
-    function buildStatePayloadForStudent(nation) {
+    function buildStatePayloadForStudent(nation, seq) {
       return {
         type: 'STATE',
+        hostSessionId,
+        stateSeq: seq,
         studentId: nation.id,
         nation,
         round: state.round,
@@ -3279,6 +3421,12 @@
 
       studentConnections = {};
       mqttConnectedStudents = {};
+      lastActionTimestampByStudent = {};
+      lastActionSeqByStudent = {};
+      seenActionMsgIds.clear();
+      hostSessionId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+      hostStateSeq = 0;
+
       state.nations.forEach((n) => { n.connectedPeer = false; });
       updateConnectedCountUI();
 
@@ -3414,13 +3562,16 @@
     function broadcastStateToStudents(onlyStudentId = null) {
       if (isStudentClientMode || !currentHostCode) return;
 
+      hostStateSeq += 1;
+      const currentSeq = hostStateSeq;
+
       // 1) PeerJS 연결 학생에게 전송
       Object.entries(studentConnections).forEach(([sid, conn]) => {
         if (onlyStudentId && Number(sid) !== Number(onlyStudentId)) return;
         const nation = state.nations.find((n) => n.id === Number(sid));
         if (conn && nation) {
           nation.connectedPeer = true;
-          const payload = buildStatePayloadForStudent(nation);
+          const payload = buildStatePayloadForStudent(nation, currentSeq);
           if (conn.open) {
             try { conn.send(payload); } catch (e) {}
           } else {
@@ -3431,21 +3582,18 @@
         }
       });
 
-      // 2) MQTT, HTTPS(443), BroadcastChannel 학생에게 전송
+      // 2) MQTT, HTTPS(443), BroadcastChannel 학생에게 전송 (항상 전체 최신 상태를 retain=true로 갱신해 구버전 잔류 방지)
       const topicBase = getRoomTopicBase(currentHostCode);
-      const targetNations = onlyStudentId
-        ? state.nations.filter((n) => n.id === Number(onlyStudentId))
-        : state.nations;
-
-      // 전체 상태 패킷 1개로 묶어 브로드캐스트
       const bulkPayload = {
         type: 'BULK_STATE',
+        hostSessionId,
+        stateSeq: currentSeq,
         onlyStudentId: onlyStudentId || null,
         round: state.round,
         year: state.year,
         generation: state.generation,
         pollution: state.pollution,
-        nations: targetNations,
+        nations: state.nations,
         nationsList: state.nations.map((n) => ({
           id: n.id,
           name: n.name,
@@ -3457,10 +3605,9 @@
       };
 
       const jsonStr = JSON.stringify(bulkPayload);
-      // retain: true 옵션으로 늦게 접속한 태블릿도 즉시 최신 상태를 받도록 설정
       hostMqttClients.forEach((mc) => {
         if (mc && mc.connected) {
-          try { mc.publish(`${topicBase}/fromHost`, jsonStr, { qos: 0, retain: !onlyStudentId }); } catch (e) {}
+          try { mc.publish(`${topicBase}/fromHost`, jsonStr, { qos: 0, retain: true }); } catch (e) {}
         }
       });
 
@@ -3468,14 +3615,17 @@
         try { broadcastChannel.postMessage(bulkPayload); } catch (e) {}
       }
 
-      // 표준 HTTPS(443) 채널로도 전송 (짧은 시간 다중 호출 시 쓰로틀링)
+      // 표준 HTTPS(443) 채널로도 전송 (짧은 시간 다중 호출 시 쓰로틀링하되 발송 시점의 최신 seq 부여)
       if (!ntfyBroadcastThrottleTimer) {
         ntfyBroadcastThrottleTimer = setTimeout(() => {
           ntfyBroadcastThrottleTimer = null;
           if (!currentHostCode) return;
+          hostStateSeq += 1;
           const ntfyTopics = getNtfyTopics(currentHostCode);
           postNtfyMessage(ntfyTopics.fromHost, {
             type: 'BULK_STATE',
+            hostSessionId,
+            stateSeq: hostStateSeq,
             round: state.round,
             year: state.year,
             generation: state.generation,
@@ -3499,7 +3649,24 @@
     function renderStudentClientState(data) {
       if (!data || !data.nation) return;
       const nation = data.nation;
-      myPlannedAction = nation.plannedAction || 2;
+      if (data.round) currentClientRound = data.round;
+
+      // 학생이 방금 선택한 액션이 아직 호스트를 거쳐 돌아오기 전의 이전 상태 패킷이라면 로컬 선택 유지
+      const nationActionSeq = Number(nation.lastActionSeq) || 0;
+      const nationActionTs = Number(nation.lastActionTs) || 0;
+      const isPendingLocalChoice =
+        myLastActionSentAt > 0 &&
+        data.round === myLastActionRound &&
+        Date.now() - myLastActionSentAt < 3500 &&
+        nationActionSeq < myActionSeq &&
+        nationActionTs < myLastActionSentAt;
+
+      if (!isPendingLocalChoice) {
+        myPlannedAction = nation.plannedAction || 2;
+        if (nation.warTargetId !== undefined) {
+          myWarTargetId = Number(nation.warTargetId);
+        }
+      }
 
       updateStudentConnectionBadge(true, `🟢 중계방(${myRoomCode}) 연결됨`);
       document.getElementById('scNationName').textContent = `내 국가: ${nation.name}`;
@@ -3532,10 +3699,13 @@
         }
       }
 
-      // 전쟁 타깃 드롭다운 업데이트
+      // 전쟁 타깃 드롭다운 업데이트 (학생이 현재 드롭다운을 조작 중일 때는 포커스 방해 방지)
       const sel = document.getElementById('scWarTargetSelect');
-      if (sel && Array.isArray(data.nationsList)) {
-        const curVal = nation.warTargetId && nation.warTargetId !== -1 ? nation.warTargetId : sel.value;
+      if (sel && Array.isArray(data.nationsList) && document.activeElement !== sel) {
+        const curVal =
+          myWarTargetId && myWarTargetId !== -1
+            ? myWarTargetId
+            : (nation.warTargetId && nation.warTargetId !== -1 ? nation.warTargetId : sel.value);
         sel.innerHTML = `<option value="-1">🎯 1등 국가 또는 랜덤 타깃 공격</option>`;
         data.nationsList.forEach((other) => {
           if (other.id !== nation.id && !other.isEliminated) {
@@ -3549,11 +3719,11 @@
       }
 
       // 현재 선택된 행동 버튼 하이라이트 & 하단 상태창 동기화
-      updateStudentActionHighlight(nation);
+      updateStudentActionHighlight(nation, isPendingLocalChoice);
     }
 
-    function updateStudentActionHighlight(nation) {
-      const planned = nation ? nation.plannedAction : myPlannedAction;
+    function updateStudentActionHighlight(nation, useLocalPlanned = false) {
+      const planned = (!useLocalPlanned && nation && nation.plannedAction) ? nation.plannedAction : myPlannedAction;
       for (let i = 1; i <= 4; i++) {
         const btn = document.getElementById(`scBtn${i}`);
         const bdg = document.getElementById(`scBtn${i}Badge`);
@@ -3588,9 +3758,10 @@
       statusEl.className = 'text-center text-xs font-extrabold text-amber-300 bg-slate-900 p-2.5 rounded-xl border border-slate-700';
       const act = ACTION_META[planned] || ACTION_META[2];
       const customChoice = nation && nation.choices && nation.choices[planned];
+      const titleEl = document.getElementById(`scBtn${planned}Title`);
       const label = planned === 5
         ? `${act.icon} 5. 이웃 국가 침략 전쟁 선포!`
-        : (customChoice ? `${act.icon} ${planned}. ${customChoice.title}` : act.name);
+        : (customChoice ? `${act.icon} ${planned}. ${customChoice.title}` : (titleEl ? titleEl.textContent : act.name));
       statusEl.textContent = `✅ 선생님 칠판에 반영된 내 선택: ${label}`;
     }
 
@@ -3653,6 +3824,10 @@
       myStudentIdentifier = identRaw;
       myStudentId = parsedNum || 0;
       myRoomCode = code;
+      myActionSeq = 0;
+      myLastActionSentAt = 0;
+      lastReceivedHostSessionId = '';
+      lastReceivedStateSeq = -1;
       isStudentClientMode = true;
 
       // 학생 기기에서는 불필요한 호스트 세션 정리
@@ -3709,6 +3884,24 @@
         renderStudentClientState(singleStateData);
       };
 
+      const isFreshHostPacket = (data) => {
+        if (data.hostSessionId) {
+          if (lastReceivedHostSessionId && data.hostSessionId !== lastReceivedHostSessionId) {
+            lastReceivedStateSeq = -1;
+            myActionSeq = 0;
+            myLastActionSentAt = 0;
+          }
+          lastReceivedHostSessionId = data.hostSessionId;
+        }
+        if (typeof data.stateSeq === 'number') {
+          if (data.stateSeq < lastReceivedStateSeq) {
+            return false;
+          }
+          lastReceivedStateSeq = data.stateSeq;
+        }
+        return true;
+      };
+
       const handleIncomingHostData = (data) => {
         if (!data) return;
         if (data.type === 'JOIN_ERROR') {
@@ -3735,7 +3928,7 @@
           const matched =
             doesNationMatchIdentifier(data.nation, studentKey) ||
             (myStudentId > 0 && Number(data.nation.id) === Number(myStudentId));
-          if (matched) {
+          if (matched && isFreshHostPacket(data)) {
             myStudentId = Number(data.nation.id);
             onReceiveStateSuccess(data);
           }
@@ -3743,10 +3936,12 @@
           const myNation =
             resolveStudentNation(data.nations, studentKey) ||
             (myStudentId > 0 ? data.nations.find((n) => Number(n.id) === Number(myStudentId)) : null);
-          if (myNation) {
+          if (myNation && isFreshHostPacket(data)) {
             myStudentId = Number(myNation.id);
             onReceiveStateSuccess({
               type: 'STATE',
+              hostSessionId: data.hostSessionId,
+              stateSeq: data.stateSeq,
               nation: myNation,
               round: data.round,
               year: data.year,
@@ -3805,14 +4000,13 @@
         } catch (e) {}
       }
 
-      // 2) 표준 HTTPS(443 포트) EventSource 수신 (학교 태블릿 방화벽 100% 통과용)
+      // 2) 표준 HTTPS(443 포트) EventSource 수신 (과거 30분 히스토리 재전송으로 인한 선택지 되돌림 방지를 위해 실시간 스트림만 구독)
       if (typeof EventSource !== 'undefined') {
         try {
           const ntfyTopics = getNtfyTopics(code);
-          // since=30m 옵션으로 호스트가 미리 게시해둔 상태가 있으면 즉시 수신
-          clientEventSource = new EventSource(`${NTFY_BASE_URL}/${ntfyTopics.fromHost}/sse?since=30m`);
+          clientEventSource = new EventSource(`${NTFY_BASE_URL}/${ntfyTopics.fromHost}/sse`);
           clientEventSource.onopen = () => {
-            sendJoinPacketAll();
+            if (!stateReceived) sendJoinPacketAll();
           };
           clientEventSource.onmessage = (ev) => {
             try {
@@ -3838,7 +4032,7 @@
             });
             mc.on('connect', () => {
               mc.subscribe(`${topicBase}/fromHost`, { qos: 0 }, () => {
-                sendJoinPacketAll();
+                if (!stateReceived) sendJoinPacketAll();
               });
             });
             mc.on('message', (topic, message) => {
@@ -3862,7 +4056,7 @@
             clientConn = conn;
 
             conn.on('open', () => {
-              sendJoinPacketAll();
+              if (!stateReceived) sendJoinPacketAll();
             });
 
             conn.on('data', (data) => {
@@ -3889,33 +4083,39 @@
       }, 1100);
     }
 
+    function onStudentWarTargetChange(val) {
+      myWarTargetId = parseInt(val, 10);
+      if (Number.isNaN(myWarTargetId)) myWarTargetId = -1;
+      if (myPlannedAction === 5) {
+        sendStudentAction(5);
+      }
+    }
+
     function sendStudentAction(actionId) {
       playSound('click');
       myPlannedAction = actionId;
+      myActionSeq += 1;
+      myLastActionSentAt = Date.now();
+      myLastActionRound = currentClientRound;
+
       const act = ACTION_META[actionId] || ACTION_META[2];
-      const warTargetId = parseInt(document.getElementById('scWarTargetSelect').value, 10);
+      const warSelectEl = document.getElementById('scWarTargetSelect');
+      const warTargetId = warSelectEl ? parseInt(warSelectEl.value, 10) : myWarTargetId;
+      myWarTargetId = Number.isNaN(warTargetId) ? -1 : warTargetId;
+
       const payload = {
         type: 'ACTION',
         studentId: myStudentId,
         studentKey: myStudentIdentifier || myStudentId,
         actionId,
-        warTargetId,
-        msgId: `${myStudentId}-${Date.now()}`
+        warTargetId: myWarTargetId,
+        actionSeq: myActionSeq,
+        clientTs: myLastActionSentAt,
+        msgId: `${myStudentId || myStudentIdentifier}-${myActionSeq}-${myLastActionSentAt}`
       };
 
-      // 버튼 즉시 하이라이트 피드백
-      for (let i = 1; i <= 4; i++) {
-        const btn = document.getElementById(`scBtn${i}`);
-        const bdg = document.getElementById(`scBtn${i}Badge`);
-        if (!btn) continue;
-        if (actionId === i) {
-          btn.classList.add('ring-2', 'ring-amber-300', 'scale-[1.01]');
-          if (bdg) bdg.textContent = '✅ 선택됨';
-        } else {
-          btn.classList.remove('ring-2', 'ring-amber-300', 'scale-[1.01]');
-          if (bdg) bdg.textContent = '선택';
-        }
-      }
+      // 1~5번 버튼 즉시 하이라이트 피드백
+      updateStudentActionHighlight(null, true);
 
       const sent = sendPayloadFromStudentToHost(payload);
       if (sent) {
